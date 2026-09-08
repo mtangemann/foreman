@@ -97,6 +97,15 @@ class Repository():
         r3_jobs = self.r3_repository.find(query, latest)
         return [Job(r3_job) for r3_job in r3_jobs]
 
+    def find_dependents(self, job: Job, recursive: bool = False) -> list[Job]:
+        """Returns the jobs that depend on the given job.
+
+        Direct dependents; pass recursive=True for transitive dependents.
+        """
+        r3_jobs = self.r3_repository.find_dependents(job.r3_job, recursive=recursive)
+        jobs = [Job(r3_job) for r3_job in r3_jobs]
+        return sorted(jobs, key=lambda j: (j.virtual_path or "", j.id))
+
     def get(self, job_id: str) -> Job:
         """Returns a job by its ID."""
         return Job(self.r3_repository._storage.get(job_id))
