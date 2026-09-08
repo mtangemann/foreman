@@ -26,3 +26,18 @@ def test_find_dependents_leaf_empty(repo):
     repository, ids = repo
     d = repository.get(ids["d"])
     assert repository.find_dependents(d) == []
+
+
+def test_find_dependencies_direct(repo):
+    repository, ids = repo
+    d = repository.get(ids["d"])
+    assert _paths(repository.find_dependencies(d)) == ["test/b", "test/c"]
+
+
+def test_find_dependencies_recursive_dedupes(repo):
+    repository, ids = repo
+    d = repository.get(ids["d"])
+    # d -> b, c ; b -> a ; c -> b : recursive set is {a, b, c}, b listed once
+    assert _paths(repository.find_dependencies(d, recursive=True)) == [
+        "test/a", "test/b", "test/c",
+    ]

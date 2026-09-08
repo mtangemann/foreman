@@ -106,6 +106,31 @@ class Repository():
         jobs = [Job(r3_job) for r3_job in r3_jobs]
         return sorted(jobs, key=lambda j: (j.virtual_path or "", j.id))
 
+    def find_dependencies(self, job: Job, recursive: bool = False) -> list[Job]:
+        """Returns the jobs the given job depends on.
+
+        Direct dependencies; pass recursive=True for transitive dependencies.
+        Git dependencies are ignored (this returns jobs only).
+        """
+        result: Dict[str, Job] = {}
+
+        def visit(current: Job) -> None:
+            for dependency in current.r3_job.dependencies:
+                if not isinstance(dependency, r3.JobDependency):
+                    continue  # skip git dependencies
+                if dependency.job in result:
+                    continue  # already collected (also dedups diamonds)
+                try:
+                    dependency_job = self.get(dependency.job)
+                except FileNotFoundError:
+                    continue  # dependency job no longer in the repo; skip it
+                result[dependency.job] = dependency_job
+                if recursive:
+                    visit(dependency_job)
+
+        visit(job)
+        return sorted(result.values(), key=lambda j: (j.virtual_path or "", j.id))
+
     def get(self, job_id: str) -> Job:
         """Returns a job by its ID."""
         return Job(self.r3_repository._storage.get(job_id))
