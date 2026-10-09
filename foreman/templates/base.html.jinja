@@ -1,52 +1,62 @@
+{% import "icons.html.jinja" as icons %}
 <!DOCTYPE html>
 
-<html>
+<html lang="en">
 
 <head>
-    <title>Foreman</title>
+    <title>{% block title %}Foreman{% endblock %}</title>
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
-    
-    <link rel="stylesheet" href="{{ url_for('static', filename='output.css') }}" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
     <link rel="stylesheet" href="{{ url_for('static', filename='node_modules/datatables.net-dt/css/dataTables.dataTables.min.css') }}" />
+    <!-- After DataTables, so Foreman's styles take precedence. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='output.css') }}" />
 
     <!-- The Monaco Editor loader interferes with dataTables, so we have to include dataTables first -->
     <script src="{{ url_for('static', filename='node_modules/jquery/dist/jquery.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='node_modules/datatables.net/js/dataTables.js') }}"></script>   
+    <script src="{{ url_for('static', filename='node_modules/datatables.net/js/dataTables.js') }}"></script>
     <script src="{{ url_for('static', filename='node_modules/htmx.org/dist/htmx.min.js') }}"></script>
     <script src="{{ url_for('static', filename='node_modules/monaco-editor/min/vs/loader.js') }}"></script>
 </head>
 
-<body>
-    <div class="flex flex-col h-screen">
-        <nav class="flex flex-row z-50 w-full bg-white border-b border-gray-200">
-            <div class="w-64 p-4">
-                <a class="" href="/">👷 Foreman</a>
-            </div>
-            <ul class="flex-1 flex flex-row font-medium bg-white">
-                <li class="m-4">
-                    <a class="hover:text-sky-600" href="{{ url_for('job_list.view') }}">Jobs</a>
-                </li>
-                <li class="m-4">
-                    <a class="hover:text-sky-600" href="{{ url_for('job_tree.view') }}">Browse
-                </li>
-                <li class="m-4">
-                    <a class="hover:text-sky-600" href="{{ url_for('search.index') }}">Search</a>
-                </li>
-            </ul>
-        </nav>
+<body class="bg-gray-50 text-gray-900 antialiased">
+    <div class="flex h-screen flex-col">
+        <header class="z-30 flex h-14 shrink-0 items-center gap-6 border-b border-gray-200 bg-white px-4">
+            <a href="/" class="flex items-center gap-2 font-semibold text-gray-900">
+                <span class="text-xl leading-none" aria-hidden="true">👷</span>Foreman
+            </a>
+            <nav class="flex items-center gap-1 text-sm font-medium" aria-label="Main">
+                {% for endpoint, label in [("job_list.view", "Jobs"), ("job_tree.view", "Browse"), ("search.index", "Search")] %}
+                {% set active = request.blueprint == endpoint.split(".")[0] %}
+                <a href="{{ url_for(endpoint) }}" {% if active %}aria-current="page"{% endif %}
+                    class="rounded-md px-3 py-1.5 transition-colors {{ 'bg-sky-50 text-sky-700' if active else 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">{{ label }}</a>
+                {% endfor %}
+            </nav>
+        </header>
 
-        <main id="main" class="flex flex-row flex-1 overflow-y-auto bg-white">
+        <main id="main" class="flex min-h-0 flex-1">
             {% block sidebar %}{% endblock %}
-            <div id="contents" class="{% if self.sidebar() %}sm:ml-64{% endif %} flex-1 px-4 py-4 overflow-y-auto">
-                {% block contents %}{% endblock %}       
+            <div id="contents" class="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
+                {% block contents %}{% endblock %}
             </div>
         </main>
     </div>
 
-    <div id="modal" class="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-50 hidden"></div>
+    <div id="modal" class="fixed inset-0 z-50 flex hidden items-center justify-center bg-gray-900/50 p-4"></div>
     <script>
         function showModal() {
             document.getElementById('modal').classList.remove('hidden');
+        }
+
+        // Copies a button's `data-copy` text and briefly confirms on the button.
+        function copyText(button) {
+            navigator.clipboard.writeText(button.dataset.copy).then(function () {
+                const label = button.querySelector('[data-copy-label]');
+                if (!label) return;
+                const original = label.textContent;
+                label.textContent = 'Copied';
+                setTimeout(function () { label.textContent = original; }, 1500);
+            });
         }
     </script>
 </body>

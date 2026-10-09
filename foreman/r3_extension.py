@@ -1,13 +1,13 @@
 """R3 extension for Foreman."""
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 
 import r3
 
-from foreman.slurm import get_slurm
+from foreman.slurm import STATUS_BY_SLURM_STATE, SlurmRecord, get_slurm
 
 
 class Job:
@@ -58,6 +58,14 @@ class Job:
         return self.r3_job.metadata.get("tags", [])
 
     @property
+    def leaf_tags(self) -> list[str]:
+        """Returns the tags that are not a parent of another tag (`a` of `a/b`)."""
+        return [
+            tag for tag in self.tags
+            if not any(other.startswith(f"{tag}/") for other in self.tags)
+        ]
+
+    @property
     def has_report(self) -> bool:
         """Returns whether this job has a report.html in its output."""
         return (self.path / "output" / "report.html").exists()
@@ -71,14 +79,25 @@ class Job:
             else:
                 return "done"
 
-        slurm_jobs = get_slurm().get_jobs()
-        slurm_status = slurm_jobs.get(self.id, None)
-        if slurm_status == "PENDING":
-            return "queued"
-        if slurm_status == "RUNNING":
-            return "running"
+        slurm = get_slurm()
+        slurm_state = slurm.get_jobs().get(self.id, None)
+        if slurm_state is not None:
+            return STATUS_BY_SLURM_STATE.get(slurm_state, "running")
+
+        # Jobs that are killed (e.g. timeout, out of memory) never write `done`.
+        records = slurm.get_history().get(self.id, [])
+        if records:
+            return records[-1].status
 
         return "ready"
+
+    @property
+    def slurm_records(self) -> list[SlurmRecord]:
+        """Returns this job's Slurm allocations, oldest first."""
+        if self.timestamp is None:
+            return []
+        since = self.timestamp.date() - timedelta(days=1)
+        return get_slurm().get_records(self.id, since=since)
 
 
 class Repository():

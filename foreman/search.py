@@ -23,16 +23,20 @@ def search_post():
         try:
             query = json.loads(query_str)
         except json.JSONDecodeError as error:
-            return f"Invalid query: {query_str}, {error}"
+            return _error("Invalid JSON query", error)
     elif query_format == 'yaml':
         try:
             query = yaml.safe_load(query_str)
         except yaml.YAMLError as error:
-            return f"Invalid query: {query_str}, {error}"
+            return _error("Invalid YAML query", error)
     else:
-        return f"Invalid format: {query_format}"
+        return _error(f"Invalid format: {query_format}")
 
     repository = Repository.from_environment()
     jobs = sorted(repository.find(query), key=lambda job: job.timestamp, reverse=True)
 
     return render_template("search/search_results.html.jinja", jobs=jobs)
+
+
+def _error(title: str, detail: object = None) -> str:
+    return render_template("search/search_error.html.jinja", title=title, detail=detail)

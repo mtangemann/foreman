@@ -2,6 +2,14 @@
 
 {% import "macros.html.jinja" as macros %}
 
+{% block title %}Jobs · Foreman{% endblock %}
+
 {% block contents %}
-{{ macros.jobs_table(jobs) }}
+<div class="mx-auto max-w-7xl">
+    <div class="mb-6 flex items-baseline gap-3">
+        <h1 class="page-title">Jobs</h1>
+        <span class="text-sm text-gray-500">{{ jobs | length }} total</span>
+    </div>
+    {{ macros.jobs_table(jobs) }}
+</div>
 {% endblock %}
