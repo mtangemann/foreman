@@ -23,10 +23,7 @@
     <div class="flex h-screen flex-col">
         <header class="z-30 flex h-14 shrink-0 items-center gap-6 border-b border-gray-200 bg-white px-4">
             <a href="/" class="flex items-center gap-2 font-semibold text-gray-900">
-                <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-600 text-white">
-                    {{ icons.icon("wrench", "h-4 w-4") }}
-                </span>
-                Foreman
+                <span class="text-xl leading-none" aria-hidden="true">👷</span>Foreman
             </a>
             <nav class="flex items-center gap-1 text-sm font-medium" aria-label="Main">
                 {% for endpoint, label in [("job_list.view", "Jobs"), ("job_tree.view", "Browse"), ("search.index", "Search")] %}

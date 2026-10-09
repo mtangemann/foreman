@@ -68,7 +68,7 @@
                     <button hx-get="{{ url_for('job_tree.move_form', path=job.virtual_path) }}" hx-target="#name-{{ job.id }}" hx-swap="innerHTML"
                         class="btn btn-ghost btn-sm" title="Relocate">{{ icons.icon("pencil") }}<span class="hidden xl:inline">Relocate</span></button>
                     {{ macros.copy_button(job.path, "Path", "btn btn-ghost btn-sm", "hidden xl:inline") }}
-                    <a href="/tensorboard/open/{{ job.id }}" target="_blank" class="btn btn-ghost btn-sm" title="Open in TensorBoard">{{ icons.icon("chart") }}<span class="hidden xl:inline">TensorBoard</span></a>
+                    <a href="/tensorboard/open/{{ job.id }}" target="_blank" class="btn btn-ghost btn-sm" title="Open in TensorBoard">{{ icons.tensorboard_logo() }}<span class="hidden xl:inline">TensorBoard</span></a>
                     {% if job.has_report %}
                     <a href="{{ url_for('job.view', id=job.id, file='/output/report.html') }}" target="_blank" class="btn btn-ghost btn-sm" title="Open report">{{ icons.icon("report") }}<span class="hidden xl:inline">Report</span></a>
                     {% endif %}

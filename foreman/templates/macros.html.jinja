@@ -99,7 +99,7 @@
             <td>
                 <div class="flex justify-end gap-1">
                     {{ copy_button(job.path, "Path", "btn btn-ghost btn-sm", "hidden xl:inline") }}
-                    <a href="/tensorboard/open/{{ job.id }}" target="_blank" class="btn btn-ghost btn-sm" title="Open in TensorBoard">{{ icons.icon("chart") }}<span class="hidden xl:inline">TensorBoard</span>
+                    <a href="/tensorboard/open/{{ job.id }}" target="_blank" class="btn btn-ghost btn-sm" title="Open in TensorBoard">{{ icons.tensorboard_logo() }}<span class="hidden xl:inline">TensorBoard</span>
                     </a>
                     {% if job.has_report %}
                     <a href="{{ url_for('job.view', id=job.id, file='/output/report.html') }}" target="_blank" class="btn btn-ghost btn-sm" title="Open report">{{ icons.icon("report") }}<span class="hidden xl:inline">Report</span>

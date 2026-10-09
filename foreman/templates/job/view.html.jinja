@@ -41,33 +41,34 @@
         {% endif %}
     </div>
 
-    <section class="card" aria-labelledby="run-heading">
+
+    <section class="card" aria-labelledby="details-heading">
         <div class="card-header">
-            <h2 id="run-heading" class="card-title">Run summary</h2>
-            {% if stats %}
-            <span class="text-xs text-gray-500">
-                Slurm job <span class="font-mono">{{ stats.last.job_id }}</span>{% if stats.last.partition %} · {{ stats.last.partition }}{% endif %}{% if stats.last.nodes and stats.last.nodes != "None assigned" %} · {{ stats.last.nodes }}{% endif %}
-            </span>
-            {% endif %}
+            <h2 id="details-heading" class="card-title">Details</h2>
         </div>
-        <div class="card-body">
-            {% if stats %}
-            <dl class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                {{ stat("Queued", stats.queued | duration, "so far" if stats.outcome == "queued" else ("submitted " ~ (stats.submit_delay | duration) ~ " after commit" if stats.submit_delay is not none else None)) }}
-                {% if stats.failed_after is not none %}
-                {{ stat("Failed after", stats.failed_after | duration, stats.outcome | capitalize ~ (", exit code " ~ stats.last.exit_code if stats.outcome == "failed" else ""), "danger") }}
-                {% else %}
-                {{ stat("Running for" if stats.outcome == "running" else "Ran for", stats.running | duration, "so far" if stats.outcome == "running" else None) }}
-                {% endif %}
-                {{ stat("Total", stats.total | duration, "since first submission") }}
-                {{ stat("Attempts", stats.attempts, (stats.preemptions ~ " preempted") if stats.preemptions else None) }}
-            </dl>
-            {% else %}
-            <p class="text-sm text-gray-500">
-                No Slurm records found for this job. It may not have been submitted yet, or it ran outside Slurm.
-            </p>
+        <dl class="card-body grid gap-4 text-sm lg:grid-cols-3">
+            <div>
+                <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Path</dt>
+                <dd class="mt-1 flex items-start gap-2">
+                    <span class="min-w-0 break-all font-mono text-xs text-gray-700">{{ job.path }}</span>
+                    {{ macros.copy_button(job.path) }}
+                </dd>
+            </div>
+            {% if job.virtual_path %}
+            <div>
+                <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Location</dt>
+                <dd class="mt-1 break-all">
+                    <a class="link" href="{{ url_for('job_tree.view', path=job.virtual_path.rsplit('/', 1)[0] if '/' in job.virtual_path else '') }}">{{ job.virtual_path }}</a>
+                </dd>
+            </div>
             {% endif %}
-        </div>
+            {% if job.origin %}
+            <div>
+                <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Origin</dt>
+                <dd class="mt-1 break-all text-gray-700">{{ job.origin }}</dd>
+            </div>
+            {% endif %}
+        </dl>
     </section>
 
     <div class="grid items-start gap-6 lg:grid-cols-5">
@@ -106,65 +107,62 @@
                 {% endfor %}
             </ol>
         </section>
-
-        <div class="space-y-6 lg:col-span-2">
-            <section class="card" aria-labelledby="details-heading">
-                <div class="card-header">
-                    <h2 id="details-heading" class="card-title">Details</h2>
+        <section class="card lg:col-span-2" aria-labelledby="tags-heading">
+            <div class="card-header">
+                <h2 id="tags-heading" class="card-title">Tags</h2>
+                <span class="text-xs text-gray-500">{{ job.tags | length }}</span>
+            </div>
+            <div class="card-body">
+                {% if job.tags %}
+                <div class="flex flex-wrap gap-1.5">
+                    {% for text in job.leaf_tags %}{{ macros.tag(text) }}{% endfor %}
                 </div>
-                <dl class="card-body space-y-4 text-sm">
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Path</dt>
-                        <dd class="mt-1 flex items-start gap-2">
-                            <span class="min-w-0 break-all font-mono text-xs text-gray-700">{{ job.path }}</span>
-                            {{ macros.copy_button(job.path) }}
-                        </dd>
+                {% set parents = job.tags | reject("in", job.leaf_tags) | list %}
+                {% if parents %}
+                <details class="group mt-3">
+                    <summary class="cursor-pointer select-none text-xs font-medium text-gray-500 hover:text-gray-700">
+                        {{ parents | length }} parent tag{{ "s" if parents | length != 1 }}
+                    </summary>
+                    <div class="mt-2 flex flex-wrap gap-1.5">
+                        {% for text in parents %}{{ macros.tag(text) }}{% endfor %}
                     </div>
-                    {% if job.virtual_path %}
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Location</dt>
-                        <dd class="mt-1 break-all">
-                            <a class="link" href="{{ url_for('job_tree.view', path=job.virtual_path.rsplit('/', 1)[0] if '/' in job.virtual_path else '') }}">{{ job.virtual_path }}</a>
-                        </dd>
-                    </div>
-                    {% endif %}
-                    {% if job.origin %}
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Origin</dt>
-                        <dd class="mt-1 break-all text-gray-700">{{ job.origin }}</dd>
-                    </div>
-                    {% endif %}
-                </dl>
-            </section>
-
-            <section class="card" aria-labelledby="tags-heading">
-                <div class="card-header">
-                    <h2 id="tags-heading" class="card-title">Tags</h2>
-                    <span class="text-xs text-gray-500">{{ job.tags | length }}</span>
-                </div>
-                <div class="card-body">
-                    {% if job.tags %}
-                    <div class="flex flex-wrap gap-1.5">
-                        {% for text in job.leaf_tags %}{{ macros.tag(text) }}{% endfor %}
-                    </div>
-                    {% set parents = job.tags | reject("in", job.leaf_tags) | list %}
-                    {% if parents %}
-                    <details class="group mt-3">
-                        <summary class="cursor-pointer select-none text-xs font-medium text-gray-500 hover:text-gray-700">
-                            {{ parents | length }} parent tag{{ "s" if parents | length != 1 }}
-                        </summary>
-                        <div class="mt-2 flex flex-wrap gap-1.5">
-                            {% for text in parents %}{{ macros.tag(text) }}{% endfor %}
-                        </div>
-                    </details>
-                    {% endif %}
-                    {% else %}
-                    <p class="text-sm text-gray-500">No tags</p>
-                    {% endif %}
-                </div>
-            </section>
-        </div>
+                </details>
+                {% endif %}
+                {% else %}
+                <p class="text-sm text-gray-500">No tags</p>
+                {% endif %}
+            </div>
+        </section>
     </div>
+
+    <section class="card" aria-labelledby="run-heading">
+        <div class="card-header">
+            <h2 id="run-heading" class="card-title">Run summary</h2>
+            {% if stats %}
+            <span class="text-xs text-gray-500">
+                Slurm job <span class="font-mono">{{ stats.last.job_id }}</span>{% if stats.last.partition %} · {{ stats.last.partition }}{% endif %}{% if stats.last.nodes and stats.last.nodes != "None assigned" %} · {{ stats.last.nodes }}{% endif %}
+            </span>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% if stats %}
+            <dl class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                {{ stat("Queued", stats.queued | duration, "so far" if stats.outcome == "queued" else ("submitted " ~ (stats.submit_delay | duration) ~ " after commit" if stats.submit_delay is not none else None)) }}
+                {% if stats.failed_after is not none %}
+                {{ stat("Failed after", stats.failed_after | duration, stats.outcome | capitalize ~ (", exit code " ~ stats.last.exit_code if stats.outcome == "failed" else ""), "danger") }}
+                {% else %}
+                {{ stat("Running for" if stats.outcome == "running" else "Ran for", stats.running | duration, "so far" if stats.outcome == "running" else None) }}
+                {% endif %}
+                {{ stat("Total", stats.total | duration, "since first submission") }}
+                {{ stat("Attempts", stats.attempts, (stats.preemptions ~ " preempted") if stats.preemptions else None) }}
+            </dl>
+            {% else %}
+            <p class="text-sm text-gray-500">
+                No Slurm records found for this job. It may not have been submitted yet, or it ran outside Slurm.
+            </p>
+            {% endif %}
+        </div>
+    </section>
 </div>
 {% endif %}
 {% endblock %}

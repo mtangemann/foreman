@@ -51,7 +51,7 @@
             <td>
                 <div class="flex justify-end gap-1">
                     {{ macros.copy_button(job.path, "Path", "btn btn-ghost btn-sm", "hidden xl:inline") }}
-                    <a href="/tensorboard/open/{{ job.id }}" target="_blank" class="btn btn-ghost btn-sm" title="Open in TensorBoard">{{ icons.icon("chart") }}<span class="hidden xl:inline">TensorBoard</span></a>
+                    <a href="/tensorboard/open/{{ job.id }}" target="_blank" class="btn btn-ghost btn-sm" title="Open in TensorBoard">{{ icons.tensorboard_logo() }}<span class="hidden xl:inline">TensorBoard</span></a>
                 </div>
             </td>
         </tr>
