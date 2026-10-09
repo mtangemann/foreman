@@ -3,11 +3,7 @@ from pathlib import Path
 import pytest
 from flask import Flask
 
-from foreman.job import job
-from foreman.job_list import job_list
-from foreman.job_tree import job_tree
-from foreman.search import search
-from foreman.settings_page import settings_page
+from foreman.blueprints import BLUEPRINTS
 from foreman.templating import autoescape
 
 
@@ -22,7 +18,7 @@ def client(repo, monkeypatch):
     # No Slurm hosts: pages must render without any Slurm information.
     app.jinja_env.autoescape = autoescape
     app.config.update(TESTING=True, SLURM_HOSTS=[], SLURM_CACHE_EXPIRATION=0)
-    for blueprint in (job, job_list, job_tree, search, settings_page):
+    for blueprint in BLUEPRINTS:
         app.register_blueprint(blueprint)
     return app.test_client()
 

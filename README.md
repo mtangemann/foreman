@@ -38,8 +38,12 @@ make pages faster:
 
 - **Tracking & TensorBoard:** MLflow links, W&B links, searching job logs for
   run URLs (the most expensive part of finding runs), and TensorBoard detection.
-- **Slurm:** live job status (`squeue`), job history and run stats (`sacct`), and
-  how many days of history to use.
+- **Slurm:** the hosts to run Slurm commands on (SSH destinations of login nodes,
+  or `local` when Foreman runs on a cluster node), how long their answers are
+  reused, live job status (`squeue`), job history and run stats (`sacct`), and
+  how many days of history to use. **Check hosts** runs `squeue --version` on
+  each saved host and shows what went wrong, e.g. an SSH login that needs a
+  password (Foreman needs password-less SSH).
 - **Indexing:** the pause between background refreshes of tracking links.
 - **Code repositories:** whether to look up which branches contain a job's
   commits.
@@ -70,9 +74,10 @@ history_days = 30
 refresh_interval = 60
 ```
 
-Host names and tracking server URLs are only configured in the Python
-configuration, since Foreman has no login and host names are used in `ssh`
-commands. Setting `TRACKING_REFRESH_INTERVAL = 0` there disables the background
+Foreman has no login, so values are validated before they are stored: Slurm
+hosts must be `local` or a plain SSH destination such as `login` or
+`me@login.example.org`, which can never be read as an `ssh` option. Tracking
+server URLs are only configured in the Python configuration. Setting `TRACKING_REFRESH_INTERVAL = 0` there disables the background
 indexer until Foreman restarts.
 
 
@@ -88,6 +93,18 @@ Dependencies tab shows the branches that *contain* the commit, the default
 branch first. They are looked up with git in R3's local mirror
 (`$R3_REPOSITORY/git/github.com/<owner>/<name>`), cached for ten minutes, and
 can be switched off on the settings page.
+
+
+## Job queue
+The **Queue** page shows your Slurm jobs from `squeue`: running jobs with how
+much of their time limit they used, and pending jobs with why they wait and when
+Slurm estimates they will start. Jobs that run an R3 job link to its page. The
+page updates itself and can filter jobs as you type.
+
+**Customize** chooses the columns (state, partition, submit/start/end times,
+elapsed time, resources, nodes, priority, user, account, host), whether to show
+your jobs or all users' jobs, and how often the page updates. These choices are
+stored in the `[queue]` section of `foreman.conf`.
 
 
 ## Editing job tags

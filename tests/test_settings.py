@@ -6,11 +6,8 @@ from flask import Flask
 
 import foreman.slurm as slurm_module
 from foreman import settings
-from foreman.job import job, tensorboard_available
-from foreman.job_list import job_list
-from foreman.job_tree import job_tree
-from foreman.search import search
-from foreman.settings_page import settings_page
+from foreman.blueprints import BLUEPRINTS
+from foreman.job import tensorboard_available
 from foreman.slurm import Slurm
 from foreman.templating import autoescape
 from foreman.tracking_index import TrackingIndex
@@ -36,15 +33,18 @@ def app(repo, conf, monkeypatch):
     app.config.from_object("foreman.config")
     app.config.update(TESTING=True, SLURM_HOSTS=[], SLURM_CACHE_EXPIRATION=0)
     settings.load(app.config, conf)
-    for blueprint in (job, job_list, job_tree, search, settings_page):
+    for blueprint in BLUEPRINTS:
         app.register_blueprint(blueprint)
     return app
 
 
 def form(**overrides):
-    """A settings form with every switch on and default numbers."""
+    """A settings page form with every switch on and default values."""
     data = {s.key: "on" for s in settings.SETTINGS if s.is_switch}
-    data.update(SLURM_HISTORY_DAYS="30", TRACKING_REFRESH_INTERVAL="60")
+    data.update(
+        SLURM_HOSTS="galvani", SLURM_CACHE_EXPIRATION="5",
+        SLURM_HISTORY_DAYS="30", TRACKING_REFRESH_INTERVAL="60",
+    )
     for key, value in overrides.items():
         if value is None:
             data.pop(key)
@@ -94,7 +94,7 @@ def test_hand_edits_apply_on_next_request(app, conf):
 def test_page_shows_every_setting(app):
     html = app.test_client().get("/settings/").get_data(as_text=True)
     for setting in settings.SETTINGS:
-        assert f'name="{setting.key}"' in html
+        assert (f'name="{setting.key}"' in html) == (setting.page == "settings")
     assert "Tracking link index" in html
 
 
