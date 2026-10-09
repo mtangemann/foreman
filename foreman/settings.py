@@ -65,6 +65,7 @@ SECTIONS = {
     "tracking": "Tracking & TensorBoard",
     "slurm": "Slurm",
     "indexing": "Indexing",
+    "repositories": "Code repositories",
 }
 
 SETTINGS = [
@@ -91,6 +92,10 @@ SETTINGS = [
             "Refresh interval (seconds)",
             "Pause between background refreshes of all jobs' tracking links.",
             int, 10, 86400),
+    Setting("REPOSITORY_BRANCHES", "repositories", "branches",
+            "Branches containing the commit",
+            "On a job's Dependencies tab, look up which branches contain each "
+            "repository's commit, using git in R3's local mirror."),
 ]
 
 SETTINGS_BY_KEY = {setting.key: setting for setting in SETTINGS}

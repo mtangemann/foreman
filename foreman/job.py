@@ -20,6 +20,7 @@ from flask import (
 
 from foreman.job_stats import build_timeline, compute_stats, format_duration
 from foreman.r3_extension import Repository
+from foreman.repositories import branches_containing, repository_links
 from foreman.settings import enabled
 from foreman.tensorboard import has_event_files
 from foreman.tracking_index import INDEX as tracking_index
@@ -90,6 +91,7 @@ def view(id: str):
         stats=compute_stats(job.timestamp, records, now),
         timeline=build_timeline(job.timestamp, records, now),
         open_file=request.args.get("file"),
+        repositories=repository_links(job.r3_job),
     )
 
 
@@ -164,6 +166,24 @@ def dependencies_downstream(id: str):
         "job/_dependency_list.html.jinja",
         job=job, jobs=jobs, direction="downstream",
         recursive=recursive, table_id="deps-downstream",
+    )
+
+
+@job.route("/view/<id>/dependencies/repositories")
+def dependencies_repositories(id: str):
+    """The job's git repositories, with the branches that contain their commits."""
+    repository = Repository.from_environment()
+    job = repository.get(id)
+    links = repository_links(job.r3_job, repository.r3_repository.path)
+    branches = {}
+    if enabled(current_app.config, "REPOSITORY_BRANCHES"):
+        branches = {
+            link.repository: branches_containing(link.mirror, link.commit)
+            for link in links if link.mirror and link.commit
+        }
+    return render_template(
+        "job/_repository_list.html.jinja", repositories=links, branches=branches,
+        branches_enabled=enabled(current_app.config, "REPOSITORY_BRANCHES"),
     )
 
 

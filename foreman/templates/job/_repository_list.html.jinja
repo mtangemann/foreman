@@ -1,0 +1,71 @@
+{% import "macros.html.jinja" as macros %}
+{% import "icons.html.jinja" as icons %}
+{% if repositories %}
+<div class="card overflow-hidden">
+<div class="overflow-x-auto">
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Repository</th>
+            <th>Commit</th>
+            <th>Branches containing it</th>
+            <th class="text-right">Browse</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for repo in repositories %}
+        {% set repo_branches = branches.get(repo.repository, []) %}
+        <tr>
+            <td class="min-w-[14rem]">
+                <div class="flex items-center gap-2">
+                    {{ icons.github("h-4 w-4 shrink-0 text-gray-500") }}
+                    {% if repo.web_url %}
+                    <a href="{{ repo.web_url }}" target="_blank" rel="noopener noreferrer" class="link [overflow-wrap:anywhere]">{{ repo.name }}</a>
+                    {% else %}<span class="[overflow-wrap:anywhere]">{{ repo.name }}</span>{% endif %}
+                </div>
+                <span class="mt-0.5 block text-xs text-gray-500">
+                    {% if repo.source %}<span class="font-mono">{{ repo.source }}</span> {% endif %}checked out to <span class="font-mono">{{ repo.destination }}</span>
+                </span>
+            </td>
+            <td class="whitespace-nowrap">
+                {% if repo.commit %}
+                <div class="flex items-center gap-1">
+                    {% if repo.commit_url %}
+                    <a href="{{ repo.commit_url }}" target="_blank" rel="noopener noreferrer" class="link font-mono text-xs" title="{{ repo.commit }}">{{ repo.short_commit }}</a>
+                    {% else %}<span class="font-mono text-xs" title="{{ repo.commit }}">{{ repo.short_commit }}</span>{% endif %}
+                    {{ macros.copy_button(repo.commit, "Copy", "btn btn-ghost btn-sm", "sr-only") }}
+                </div>
+                {% else %}<span class="text-gray-400">Not resolved</span>{% endif %}
+            </td>
+            <td class="min-w-[12rem] max-w-md">
+                {% if repo_branches %}
+                <div class="flex flex-wrap gap-1">
+                    {% for branch in repo_branches[:4] %}{{ macros.tag(branch) }}{% endfor %}
+                    {% if repo_branches | length > 4 %}
+                    <span class="self-center text-xs text-gray-500" title="{{ repo_branches[4:] | join(', ') }}">+{{ repo_branches | length - 4 }} more</span>
+                    {% endif %}
+                </div>
+                {% elif not branches_enabled %}<span class="text-xs text-gray-400">Lookup switched off in the settings</span>
+                {% elif repo.mirror %}<span class="text-xs text-gray-400">None in the local mirror</span>
+                {% else %}<span class="text-xs text-gray-400">No local mirror</span>{% endif %}
+            </td>
+            <td>
+                <div class="flex justify-end gap-1">
+                    {% if repo.tree_url %}
+                    <a href="{{ repo.tree_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm" title="The code at this commit">{{ icons.icon("document") }}Code</a>
+                    {% endif %}
+                    {% if repo_branches and repo.compare_url(repo_branches[0]) %}
+                    <a href="{{ repo.compare_url(repo_branches[0]) }}" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm"
+                        title="Changes on {{ repo_branches[0] }} since this commit">{{ icons.icon("external") }}Compare to {{ repo_branches[0] }}</a>
+                    {% endif %}
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+</div>
+{% else %}
+<div class="card card-body text-sm text-gray-500">This job does not depend on any git repository.</div>
+{% endif %}

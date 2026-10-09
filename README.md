@@ -41,6 +41,8 @@ make pages faster:
 - **Slurm:** live job status (`squeue`), job history and run stats (`sacct`), and
   how many days of history to use.
 - **Indexing:** the pause between background refreshes of tracking links.
+- **Code repositories:** whether to look up which branches contain a job's
+  commits.
 
 The page also shows the state of the tracking-link index and its cache, which
 can be refreshed or cleared there.
@@ -72,6 +74,20 @@ Host names and tracking server URLs are only configured in the Python
 configuration, since Foreman has no login and host names are used in `ssh`
 commands. Setting `TRACKING_REFRESH_INTERVAL = 0` there disables the background
 indexer until Foreman restarts.
+
+
+## Code repositories
+A job's sidebar lists the git repositories it depends on under **Repositories**,
+each linking to the code on GitHub at exactly the commit the job used (and at
+the checked-out path, if only part of the repository was used). The job's
+**Dependencies** tab lists them below the jobs it depends on, with links to the
+repository, the commit, and the changes since then on the default branch.
+
+R3 records each repository's exact commit, not the branch it came from, so the
+Dependencies tab shows the branches that *contain* the commit, the default
+branch first. They are looked up with git in R3's local mirror
+(`$R3_REPOSITORY/git/github.com/<owner>/<name>`), cached for ten minutes, and
+can be switched off on the settings page.
 
 
 ## Editing job tags

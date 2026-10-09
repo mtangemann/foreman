@@ -22,7 +22,7 @@ def views(tmp_path, monkeypatch):
         id="test-job", path=root, timestamp=datetime(2024, 1, 1),
         status="done", tags=[], leaf_tags=[], slurm_records=[],
         virtual_path="folder/example",
-        r3_job=SimpleNamespace(path=root),
+        r3_job=SimpleNamespace(path=root, dependencies=[]),
         has_report=True, name="Example", description=None, origin=None,
     )
     repository = SimpleNamespace(

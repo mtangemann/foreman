@@ -25,5 +25,24 @@
             <h2 class="mb-2 px-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500">Files</h2>
             <section id="files" hx-trigger="load" hx-get="{{ url_for('job.view_directory', id=job.id) }}"></section>
         </div>
+
+        {% if repositories %}
+        <div>
+            <h2 class="mb-2 px-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500">Repositories</h2>
+            <ul class="space-y-0.5">
+                {% for repo in repositories %}
+                <li>
+                    <a {% if repo.tree_url %}href="{{ repo.tree_url }}" target="_blank" rel="noopener noreferrer"{% endif %}
+                        title="{{ repo.repository }} at {{ repo.commit or 'an unresolved commit' }}{% if repo.source %}, {{ repo.source }}{% endif %}, checked out to {{ repo.destination }}"
+                        class="flex min-w-0 items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                        {{ icons.github("h-4 w-4 shrink-0 text-gray-500") }}
+                        <span class="min-w-0 flex-1 truncate">{{ repo.name.split("/")[-1] }}</span>
+                        {% if repo.commit %}<span class="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] text-gray-600">{{ repo.short_commit }}</span>{% endif %}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
     </div>
 </aside>
