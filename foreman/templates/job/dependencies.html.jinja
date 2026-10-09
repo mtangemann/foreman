@@ -1,15 +1,22 @@
-<h1 class="text-xl font-bold mb-4">Dependencies of {{ job.virtual_path or job.id }}</h1>
+{% import "macros.html.jinja" as macros %}
+<div class="mx-auto max-w-7xl space-y-8">
+    <div>
+        {{ macros.breadcrumbs([("Jobs", url_for("job_list.view")), (job.id[:8], url_for("job.view", id=job.id)), ("Dependencies", None)]) }}
+        <h1 class="page-title">Dependencies</h1>
+        <p class="mt-1 text-sm text-gray-500">of {{ job.virtual_path or job.name or job.id }}</p>
+    </div>
 
-<section class="mb-8">
-    <h2 class="text-lg font-semibold mb-2">Depends on</h2>
-    <div id="upstream-deps"
-         hx-get="{{ url_for('job.dependencies_upstream', id=job.id) }}"
-         hx-trigger="load" hx-swap="innerHTML"></div>
-</section>
+    <section>
+        <h2 class="mb-3 text-base font-semibold text-gray-900">Depends on</h2>
+        <div id="upstream-deps"
+             hx-get="{{ url_for('job.dependencies_upstream', id=job.id) }}"
+             hx-trigger="load" hx-swap="innerHTML"></div>
+    </section>
 
-<section>
-    <h2 class="text-lg font-semibold mb-2">Depended on by</h2>
-    <div id="downstream-deps"
-         hx-get="{{ url_for('job.dependencies_downstream', id=job.id) }}"
-         hx-trigger="load" hx-swap="innerHTML"></div>
-</section>
+    <section>
+        <h2 class="mb-3 text-base font-semibold text-gray-900">Depended on by</h2>
+        <div id="downstream-deps"
+             hx-get="{{ url_for('job.dependencies_downstream', id=job.id) }}"
+             hx-trigger="load" hx-swap="innerHTML"></div>
+    </section>
+</div>

@@ -1,3 +1,117 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Shared building blocks. Rebuild with `make css` after changing this file. */
+@layer components {
+    .btn {
+        @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium shadow-sm ring-1 ring-inset transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-60;
+    }
+    .btn-primary {
+        @apply bg-sky-600 text-white ring-sky-600 hover:bg-sky-500;
+    }
+    .btn-secondary {
+        @apply bg-white text-gray-700 ring-gray-300 hover:bg-gray-50 hover:text-gray-900;
+    }
+    .btn-danger {
+        @apply bg-red-600 text-white ring-red-600 hover:bg-red-500;
+    }
+    .btn-ghost {
+        @apply text-gray-600 shadow-none ring-transparent hover:bg-gray-100 hover:text-gray-900;
+    }
+    .btn-sm {
+        @apply gap-1 px-2 py-1 text-xs;
+    }
+    .btn-icon {
+        @apply h-4 w-4 shrink-0;
+    }
+
+    .link {
+        @apply font-medium text-sky-700 hover:text-sky-900 hover:underline;
+    }
+
+    .card {
+        @apply rounded-xl border border-gray-200 bg-white shadow-sm;
+    }
+    .card-header {
+        @apply flex items-center justify-between gap-4 border-b border-gray-100 px-5 py-3;
+    }
+    .card-title {
+        @apply text-sm font-semibold text-gray-900;
+    }
+    .card-body {
+        @apply px-5 py-4;
+    }
+
+    .page-title {
+        @apply text-2xl font-semibold tracking-tight text-gray-900;
+    }
+
+    .input {
+        @apply block rounded-md border-0 bg-white px-3 py-1.5 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500;
+    }
+
+    .data-table {
+        @apply w-full text-left text-sm text-gray-700;
+    }
+    .data-table thead th {
+        @apply whitespace-nowrap border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500;
+    }
+    .data-table tbody td,
+    .data-table tbody th {
+        @apply border-b border-gray-100 px-4 py-3 align-middle;
+    }
+    .data-table tbody tr:last-child td,
+    .data-table tbody tr:last-child th {
+        @apply border-b-0;
+    }
+    .data-table tbody tr {
+        @apply transition-colors hover:bg-gray-50;
+    }
+}
+
+/* DataTables, restyled to match. Not in a layer: Tailwind would drop rules for
+   classes that only DataTables adds at runtime. */
+div.dt-container {
+    @apply text-sm text-gray-700;
+}
+div.dt-container .dt-layout-row {
+    @apply m-0 px-4 py-3;
+}
+div.dt-container .dt-layout-row.dt-layout-table {
+    @apply overflow-x-auto border-t border-gray-100 p-0;
+}
+div.dt-container .dt-search input,
+div.dt-container .dt-length select {
+    @apply rounded-md border-0 bg-white px-3 py-1.5 text-sm shadow-sm ring-1 ring-inset ring-gray-300 focus:outline-none focus:ring-2 focus:ring-sky-500;
+}
+div.dt-container .dt-search input {
+    @apply ml-2 w-64 max-w-full;
+}
+div.dt-container .dt-length select {
+    @apply mr-2;
+}
+div.dt-container .dt-info {
+    @apply text-gray-500;
+}
+div.dt-container .dt-paging .dt-paging-button {
+    @apply rounded-md border-0 px-2.5 py-1 text-sm text-gray-700 !important;
+    background: none !important;
+}
+div.dt-container .dt-paging .dt-paging-button:hover {
+    @apply bg-gray-100 text-gray-900 !important;
+}
+div.dt-container .dt-paging .dt-paging-button.current,
+div.dt-container .dt-paging .dt-paging-button.current:hover {
+    @apply bg-sky-50 font-semibold text-sky-700 ring-1 ring-inset ring-sky-200 !important;
+}
+div.dt-container .dt-paging .dt-paging-button.disabled {
+    @apply text-gray-300 !important;
+}
+table.dataTable.data-table > thead > tr > th,
+table.dataTable.data-table > tbody > tr > td {
+    @apply px-4;
+}
+table.dataTable.data-table > thead > tr > th {
+    @apply border-b border-gray-200;
+}

@@ -1,13 +1,28 @@
+{% import "icons.html.jinja" as icons %}
+{% set row = "flex w-full min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-left text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer" %}
 {% if not is_root %}
-v {{ name }}
+<button type="button" class="{{ row }}" aria-expanded="true"
+    onclick="const open = this.getAttribute('aria-expanded') === 'true'; this.setAttribute('aria-expanded', !open); this.nextElementSibling.classList.toggle('hidden', open); this.firstElementChild.classList.toggle('-rotate-90', open);">
+    {{ icons.icon("chevron-down", "h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform") }}
+    {{ icons.icon("folder", "h-4 w-4 shrink-0 text-sky-500") }}
+    <span class="truncate">{{ name }}</span>
+</button>
 {% endif %}
-<ul>
+<ul class="{{ 'ml-3 border-l border-gray-200 pl-1.5' if not is_root }}">
     {% for entry in entries %}
-    <li class="ml-2">
+    <li>
         {% if entry.is_dir %}
-        &gt; <a hx-get="{{ entry.url }}" hx-target="closest li" class="underline text-sky-600 hover:no-underline hover:text-sky-400">{{ entry.name }}</a>
+        <a hx-get="{{ entry.url }}" hx-target="closest li" class="{{ row }}" title="{{ entry.name }}">
+            {{ icons.icon("chevron-right", "h-3.5 w-3.5 shrink-0 text-gray-400") }}
+            {{ icons.icon("folder", "h-4 w-4 shrink-0 text-sky-500") }}
+            <span class="truncate">{{ entry.name }}</span>
+        </a>
         {% else %}
-        <a hx-get="{{ entry.url }}" hx-target="#contents" class="underline text-sky-600 hover:no-underline hover:text-sky-400">{{ entry.name }}</a>
+        <a hx-get="{{ entry.url }}" hx-target="#contents" class="{{ row }}" title="{{ entry.name }}">
+            <span class="w-3.5 shrink-0"></span>
+            {{ icons.icon("document", "h-4 w-4 shrink-0 text-gray-400") }}
+            <span class="truncate">{{ entry.name }}</span>
+        </a>
         {% endif %}
     </li>
     {% endfor %}

@@ -58,6 +58,14 @@ class Job:
         return self.r3_job.metadata.get("tags", [])
 
     @property
+    def leaf_tags(self) -> list[str]:
+        """Returns the tags that are not a parent of another tag (`a` of `a/b`)."""
+        return [
+            tag for tag in self.tags
+            if not any(other.startswith(f"{tag}/") for other in self.tags)
+        ]
+
+    @property
     def has_report(self) -> bool:
         """Returns whether this job has a report.html in its output."""
         return (self.path / "output" / "report.html").exists()

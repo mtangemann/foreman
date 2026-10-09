@@ -1,63 +1,130 @@
+{% import "icons.html.jinja" as icons %}
+
+{# Pill colors and whether the dot pulses, by job status. #}
+{% set status_styles = {
+    "ready": ("bg-gray-50 text-gray-700 ring-gray-300", "bg-gray-400", False),
+    "queued": ("bg-amber-50 text-amber-800 ring-amber-300", "bg-amber-500", False),
+    "running": ("bg-sky-50 text-sky-800 ring-sky-300", "bg-sky-500", True),
+    "done": ("bg-emerald-50 text-emerald-800 ring-emerald-300", "bg-emerald-500", False),
+    "completed": ("bg-emerald-50 text-emerald-800 ring-emerald-300", "bg-emerald-500", False),
+    "failed": ("bg-red-50 text-red-800 ring-red-300", "bg-red-500", False),
+    "out of memory": ("bg-red-50 text-red-800 ring-red-300", "bg-red-500", False),
+    "node failure": ("bg-red-50 text-red-800 ring-red-300", "bg-red-500", False),
+    "timeout": ("bg-orange-50 text-orange-800 ring-orange-300", "bg-orange-500", False),
+    "cancelled": ("bg-gray-100 text-gray-600 ring-gray-300", "bg-gray-500", False),
+    "preempted": ("bg-violet-50 text-violet-800 ring-violet-300", "bg-violet-500", False),
+    "requeued": ("bg-violet-50 text-violet-800 ring-violet-300", "bg-violet-500", False),
+} %}
+
 {% macro status(status) -%}
-    {% if status == "ready" %}
-    <span class="bg-gray-100 text-gray-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded dark:bg-gray-700 dark:text-gray-400 border border-gray-500">Ready</span>
-    {% elif status == "queued" %}
-    <span class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded dark:bg-gray-700 dark:text-yellow-300 border border-yellow-300">Queued</span>
-    {% elif status == "running" %}
-    <span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded dark:bg-gray-700 dark:text-blue-400 border border-blue-400">Running</span>
-    {% elif status == "done" %}
-    <span class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded dark:bg-gray-700 dark:text-green-400 border border-green-400">Done</span>
-    {% elif status == "completed" %}
-    <span class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded dark:bg-gray-700 dark:text-green-400 border border-green-400">Completed</span>
-    {% elif status == "failed" %}
-    <span class="bg-red-100 text-red-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded dark:bg-gray-700 dark:text-red-400 border border-red-400">Failed</span>
-    {% else %}
-    <span class="bg-purple-100 text-purple-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded dark:bg-gray-700 dark:text-purple-400 border border-purple-400">{{ status }} (?)</span>
-    {% endif %}
+{% set pill, dot, pulse = status_styles.get(status, ("bg-purple-50 text-purple-800 ring-purple-300", "bg-purple-500", False)) %}
+<span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 align-middle text-xs font-medium ring-1 ring-inset {{ pill }}">
+    <span class="relative flex h-1.5 w-1.5">
+        {% if pulse %}<span class="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 {{ dot }}"></span>{% endif %}
+        <span class="relative inline-flex h-1.5 w-1.5 rounded-full {{ dot }}"></span>
+    </span>
+    {{ status | capitalize }}
+</span>
+{%- endmacro %}
+
+{% macro copy_button(text, label="Copy", class="btn btn-secondary btn-sm", label_class="") -%}
+<button type="button" class="{{ class }}" data-copy="{{ text }}" onclick="copyText(this)" title="Copy {{ text }}">
+    {{ icons.icon("copy") }}<span data-copy-label class="{{ label_class }}">{{ label }}</span>
+</button>
+{%- endmacro %}
+
+{# Breadcrumbs from (label, url) pairs; the last one is the current page. #}
+{% macro breadcrumbs(items) -%}
+<nav aria-label="Breadcrumb" class="mb-4">
+    <ol class="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-gray-500">
+        {% for label, url in items %}
+        {% if not loop.first %}<li aria-hidden="true">{{ icons.icon("chevron-right", "h-3.5 w-3.5 text-gray-400") }}</li>{% endif %}
+        <li class="min-w-0 {{ 'truncate' if loop.last }}">
+            {% if url and not loop.last %}
+            <a href="{{ url }}" class="hover:text-gray-900 hover:underline">{{ label }}</a>
+            {% else %}
+            <span {% if loop.last %}aria-current="page"{% endif %} class="font-medium text-gray-700">{{ label }}</span>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ol>
+</nav>
+{%- endmacro %}
+
+{% macro file_breadcrumbs(uuid, path) -%}
+{{ breadcrumbs([("Jobs", url_for("job_list.view")), (uuid[:8], url_for("job.view", id=uuid)), (path, None)]) }}
+{%- endmacro %}
+
+{% macro tag(text, label=None) -%}
+<span class="inline-block max-w-full truncate rounded-md bg-gray-100 px-1.5 py-0.5 align-middle text-xs text-gray-700 ring-1 ring-inset ring-gray-200" title="{{ text }}">{{ label or text }}</span>
+{%- endmacro %}
+
+{# The most specific tags of a job, shortened relative to its virtual path. #}
+{% macro leaf_tags(job) -%}
+{% set base = (job.virtual_path or "") ~ "/" %}
+{% for text in job.leaf_tags %}
+{{ tag(text, "…/" ~ text[base|length:] if base != "/" and text.startswith(base) else text) }}
+{% endfor %}
 {%- endmacro %}
 
 {% macro jobs_table(jobs, table_id="jobs") -%}
-<table id="{{ table_id }}" class="table-auto">
+<div class="card overflow-hidden">
+<table id="{{ table_id }}" class="data-table">
     <thead>
         <tr>
-            <th>UUID</th>
-            <th>Date</th>
+            <th>Job</th>
             <th>Status</th>
+            <th>Created</th>
             <th>Tags</th>
-            <th>Actions</th>
+            <th class="text-right">Actions</th>
         </tr>
     </thead>
     <tbody>
         {% for job in jobs %}
         <tr>
-            <td class="font-monospace"><a href="{{ url_for('job.view', id=job.id) }}" class="underline text-sky-600 hover:no-underline hover:text-sky-400">{{ job.id }}</a></td>
-            <td class="font-monospace">{{ job.timestamp.strftime("%Y-%m-%d %H:%M:%S") }}</td>
-            <td>{{ status(job.status) }}</td>
-            <td>
-                {% if job.virtual_path %}<strong>{{ job.virtual_path }}</strong><br>{% endif %}
-                {% for tag in job.tags %}#{{ tag }} {% endfor %}
+            <td class="min-w-[16rem] max-w-md" data-search="{{ job.id }} {{ job.virtual_path or '' }} {{ job.name or '' }}">
+                <a href="{{ url_for('job.view', id=job.id) }}" class="link block [overflow-wrap:anywhere]">
+                    {{ job.virtual_path or job.name or "Untitled job" }}
+                </a>
+                <span class="font-mono text-xs text-gray-500" title="{{ job.id }}">{{ job.id[:8] }}</span>
+            </td>
+            <td data-search="{{ job.status }}">{{ status(job.status) }}</td>
+            <td class="whitespace-nowrap text-gray-600" data-order="{{ job.timestamp.isoformat() }}">
+                {{ job.timestamp.strftime("%Y-%m-%d") }}
+                <span class="text-gray-400">{{ job.timestamp.strftime("%H:%M") }}</span>
+            </td>
+            <td class="min-w-[12rem] max-w-sm" data-search="{{ job.tags | join(' ') }}">
+                <div class="flex flex-wrap gap-1">{{ leaf_tags(job) }}</div>
             </td>
             <td>
-                <button type="button" class="underline text-sky-600 hover:no-underline hover:text-sky-400"
-                    onclick="navigator.clipboard.writeText('{{ job.path }}')">Copy Path</button>
-                <a href="/tensorboard/open/{{ job.id }}" target="_blank"
-                    class="underline text-sky-600 hover:no-underline hover:text-sky-400">Tensorboard</a>
-                {% if job.has_report %}
-                <a href="{{ url_for('job.view', id=job.id, file='/output/report.html') }}" target="_blank"
-                    class="underline text-sky-600 hover:no-underline hover:text-sky-400">Report</a>
-                {% endif %}
+                <div class="flex justify-end gap-1">
+                    {{ copy_button(job.path, "Path", "btn btn-ghost btn-sm", "hidden xl:inline") }}
+                    <a href="/tensorboard/open/{{ job.id }}" target="_blank" class="btn btn-ghost btn-sm" title="Open in TensorBoard">{{ icons.icon("chart") }}<span class="hidden xl:inline">TensorBoard</span>
+                    </a>
+                    {% if job.has_report %}
+                    <a href="{{ url_for('job.view', id=job.id, file='/output/report.html') }}" target="_blank" class="btn btn-ghost btn-sm" title="Open report">{{ icons.icon("report") }}<span class="hidden xl:inline">Report</span>
+                    </a>
+                    {% endif %}
+                </div>
             </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+</div>
 
 <script>
     $(document).ready(function () {
         if ($.fn.DataTable.isDataTable('#{{ table_id }}')) {
             $('#{{ table_id }}').DataTable().destroy();
         }
-        $('#{{ table_id }}').DataTable({ "order": [[1, 'desc']] });
+        $('#{{ table_id }}').DataTable({
+            order: [[2, 'desc']],
+            pageLength: 25,
+            autoWidth: false,
+            columnDefs: [{ targets: [3, 4], orderable: false }],
+            language: { search: '', searchPlaceholder: 'Filter jobs…' },
+        });
     });
 </script>
 {%- endmacro %}

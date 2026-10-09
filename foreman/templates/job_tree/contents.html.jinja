@@ -1,118 +1,87 @@
-<nav aria-label="breadcrumb" class="mb-4">
-    <ol class="flex flex-row text-gray-600 text-sm">
-        <li data-droppable="true" data-path="/">
-            <a hx-get="{{ url_for('job_tree.view') }}" hx-target="#contents" hx-replace-url="true" class="hover:cursor-pointer">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
-                    <path d="M11.47 3.841a.75.75 0 0 1 1.06 0l8.69 8.69a.75.75 0 1 0 1.06-1.061l-8.689-8.69a2.25 2.25 0 0 0-3.182 0l-8.69 8.69a.75.75 0 1 0 1.061 1.06l8.69-8.689Z" />
-                    <path d="m12 5.432 8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 0 1-.75-.75v-4.5a.75.75 0 0 0-.75-.75h-3a.75.75 0 0 0-.75.75V21a.75.75 0 0 1-.75.75H5.625a1.875 1.875 0 0 1-1.875-1.875v-6.198a2.29 2.29 0 0 0 .091-.086L12 5.432Z" />
-                </svg>
+{% import "macros.html.jinja" as macros %}
+{% import "icons.html.jinja" as icons %}
+<div class="mx-auto max-w-7xl">
+<nav aria-label="Breadcrumb" class="mb-4">
+    <ol class="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1 text-sm text-gray-500">
+        <li data-droppable="true" data-path="/" class="rounded">
+            <a hx-get="{{ url_for('job_tree.view') }}" hx-target="#contents" hx-replace-url="true" class="flex items-center rounded p-1 hover:cursor-pointer hover:bg-gray-100 hover:text-gray-900" title="All jobs">
+                {{ icons.icon("home", "h-4 w-4") }}
             </a>
         </li>
-
         {% for name, path in breadcrumbs.items() %}
-        <li data-droppable="true" data-path="{{ path }}">
-            &nbsp;/&nbsp;
-            <a hx-get="{{ url_for('job_tree.view', path=path) }}" hx-target="#contents" hx-replace-url="true" class="underline text-sky-600 hover:cursor-pointer hover:no-underline hover:text-sky-400">{{ name }}</a>
+        <li aria-hidden="true">{{ icons.icon("chevron-right", "h-3.5 w-3.5 text-gray-400") }}</li>
+        <li data-droppable="true" data-path="{{ path }}" class="min-w-0 rounded">
+            <a hx-get="{{ url_for('job_tree.view', path=path) }}" hx-target="#contents" hx-replace-url="true"
+                class="block truncate rounded px-1 py-0.5 hover:cursor-pointer hover:bg-gray-100 hover:text-gray-900 {{ 'font-medium text-gray-700' if loop.last }}">{{ name }}</a>
         </li>
         {% endfor %}
     </ol>
 </nav>
 
-<table class="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
-    <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+<div class="card overflow-hidden">
+<div class="overflow-x-auto">
+<table class="data-table">
+    <thead>
         <tr>
-            <th scope="col" class="px-0 py-3"></th>
-            <th scope="col" class="px-6 py-3 w-full">
-                Name
-            </th>
-            <th scope="col" class="px-6 py-3">
-                Date
-            </th>
-            <th scope="col" class="px-6 py-3">
-                Status
-            </th>
-            <th scope="col" class="px-6 py-3">
-                Actions
-            </th>
+            <th class="w-full">Name</th>
+            <th>Created</th>
+            <th>Status</th>
+            <th class="text-right">Actions</th>
         </tr>
     </thead>
 
     <tbody>
         {% for name, path in directories.items() %}
-        <tr
-            class="bg-white border-b dark:bg-gray-800 dark:border-gray-700"
-            draggable="true"
-            data-droppable="true"
-            data-path="{{ path }}"
-        >
-            <td>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
-                    <path d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-15a3 3 0 0 0-3 3V18a3 3 0 0 0 3 3h15ZM1.5 10.146V6a3 3 0 0 1 3-3h5.379a2.25 2.25 0 0 1 1.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 0 1 3 3v1.146A4.483 4.483 0 0 0 19.5 9h-15a4.483 4.483 0 0 0-3 1.146Z" />
-                </svg>
-            </td>
-            <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white" id="folder-{{ loop.index }}">
-                <a hx-get="{{ url_for('job_tree.view', path=path) }}" hx-target="#contents" hx-replace-url="true" class="underline text-sky-600 hover:no-underline hover:cursor-pointer hover:text-sky-400">{{ name }}</a>
+        <tr draggable="true" data-droppable="true" data-path="{{ path }}" class="group/item">
+            <th scope="row" class="font-medium" id="folder-{{ loop.index }}">
+                <a hx-get="{{ url_for('job_tree.view', path=path) }}" hx-target="#contents" hx-replace-url="true"
+                    class="flex items-center gap-2 text-gray-900 hover:cursor-pointer hover:text-sky-700">
+                    {{ icons.icon("folder", "h-5 w-5 shrink-0 text-sky-500") }}<span class="truncate">{{ name }}</span>
+                </a>
             </th>
             <td></td>
             <td></td>
-            <td>
-                <button
-                    hx-get="{{ url_for('job_tree.move_form', path=path) }}"
-                    hx-target="#folder-{{ loop.index }}"
-                    hx-swap="innerHTML"
-                    class="underline text-sky-600 hover:no-underline hover:text-sky-400 group-hover/item:visible">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="inline w-4 h-4 me-1 align-text-bottom">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
-                    </svg>
-                    Relocate
-                </button>
+            <td class="text-right">
+                <button hx-get="{{ url_for('job_tree.move_form', path=path) }}" hx-target="#folder-{{ loop.index }}" hx-swap="innerHTML"
+                    class="btn btn-ghost btn-sm" title="Relocate">{{ icons.icon("pencil") }}<span class="hidden xl:inline">Relocate</span></button>
             </td>
         </tr>
         {% endfor %}
 
         {% for name, entry in jobs.items() %}
-        <tr
-            draggable="true"
-            class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 group/item hover:bg-gray-50"
-            data-path="{{ entry[0].virtual_path }}"
-        >
-            <td></td>
-            <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white" id="name-{{ entry[0].id }}">
-                <a href="{{ url_for('job.view', id=entry[0].id) }}" class="underline text-sky-600 hover:no-underline hover:text-sky-400">
-                    {{ name }}
+        {% set job = entry[0] %}
+        <tr draggable="true" class="group/item" data-path="{{ job.virtual_path }}">
+            <th scope="row" class="font-medium" id="name-{{ job.id }}">
+                <a href="{{ url_for('job.view', id=job.id) }}" class="flex items-center gap-2 text-gray-900 hover:text-sky-700">
+                    {{ icons.icon("document", "h-5 w-5 shrink-0 text-gray-400") }}<span class="truncate">{{ name }}</span>
                 </a>
             </th>
-            <td class="px-6 py-4 whitespace-nowrap">
-                {{ entry[0].timestamp.strftime("%Y-%m-%d %H:%M:%S") }}
+            <td class="whitespace-nowrap text-gray-600">
+                {{ job.timestamp.strftime("%Y-%m-%d") }} <span class="text-gray-400">{{ job.timestamp.strftime("%H:%M") }}</span>
                 {% if entry|length > 1 %}
-                ( <a href="{{ url_for('job_tree.view_revisions', path=entry[0].virtual_path) }}" class="underline text-sky-600 hover:no-underline hover:text-sky-400">{{ entry|length }} revisions</a> )
+                <a href="{{ url_for('job_tree.view_revisions', path=job.virtual_path) }}" class="link ml-1 text-xs">{{ entry|length }} revisions</a>
                 {% endif %}
             </td>
-            <td class="px-6 py-4" hx-get="{{ url_for('job.status', id=entry[0].id) }}" hx-trigger="every 2s"></td>
-            <td class="px-6 py-4 whitespace-nowrap">
-                <button
-                    hx-get="{{ url_for('job_tree.move_form', path=entry[0].virtual_path) }}"
-                    hx-target="#name-{{ entry[0].id }}"
-                    hx-swap="innerHTML"
-                    class="underline text-sky-600 hover:no-underline hover:text-sky-400 group-hover/item:visible">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="inline w-4 h-4 me-1 align-text-bottom">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
-                    </svg>
-                    Relocate
-                </button>
-
-                <button type="button" class="underline text-sky-600 hover:no-underline hover:text-sky-400"
-                    onclick="navigator.clipboard.writeText('{{ entry[0].path }}')">Copy Path</button>
-
-                <a href="/tensorboard/open/{{ entry[0].id }}" target="_blank"
-                    class="underline text-sky-600 hover:no-underline hover:text-sky-400">Tensorboard</a>
-
-                {% if entry[0].has_report %}
-                <a href="{{ url_for('job.view', id=entry[0].id, file='/output/report.html') }}" target="_blank"
-                    class="underline text-sky-600 hover:no-underline hover:text-sky-400">Report</a>
-                {% endif %}
+            <td hx-get="{{ url_for('job.status', id=job.id) }}" hx-trigger="every 5s">{{ macros.status(job.status) }}</td>
+            <td>
+                <div class="flex justify-end gap-1">
+                    <button hx-get="{{ url_for('job_tree.move_form', path=job.virtual_path) }}" hx-target="#name-{{ job.id }}" hx-swap="innerHTML"
+                        class="btn btn-ghost btn-sm" title="Relocate">{{ icons.icon("pencil") }}<span class="hidden xl:inline">Relocate</span></button>
+                    {{ macros.copy_button(job.path, "Path", "btn btn-ghost btn-sm", "hidden xl:inline") }}
+                    <a href="/tensorboard/open/{{ job.id }}" target="_blank" class="btn btn-ghost btn-sm" title="Open in TensorBoard">{{ icons.icon("chart") }}<span class="hidden xl:inline">TensorBoard</span></a>
+                    {% if job.has_report %}
+                    <a href="{{ url_for('job.view', id=job.id, file='/output/report.html') }}" target="_blank" class="btn btn-ghost btn-sm" title="Open report">{{ icons.icon("report") }}<span class="hidden xl:inline">Report</span></a>
+                    {% endif %}
+                </div>
             </td>
         </tr>
         {% endfor %}
+
+        {% if not directories and not jobs %}
+        <tr><td colspan="4" class="py-8 text-center text-gray-500">No jobs here.</td></tr>
+        {% endif %}
     </tbody>
 </table>
+</div>
+</div>
+</div>

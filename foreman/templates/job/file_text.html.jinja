@@ -1,19 +1,12 @@
+{% import "macros.html.jinja" as macros %}
 <div class="flex flex-col h-full">
-<nav aria-label="breadcrumb" class="mb-4">
-    <ol class="flex flex-row text-gray-600 text-sm">
-        <li><a href="/" class="underline text-sky-600 hover:no-underline hover:text-sky-400">Jobs</a>&nbsp;/&nbsp;</li>
-        <li aria-current="page">
-            <a href="/job/view/{{ uuid }}" class="underline text-sky-600 hover:no-underline hover:text-sky-400">{{ uuid }}</a>&nbsp;/&nbsp;</li>
-        <li class="breadcrumb-item">files&nbsp;/&nbsp;</li>
-        <li class="breadcrumb-item active" aria-current="page">{{ path }}</li>
-    </ol>
-</nav>
+{{ macros.file_breadcrumbs(uuid, path) }}
 
 <pre id="file_content" style="width:0;height:0;overflow:hidden;">
 {{ content }}
 </pre>
 
-<div id="container" class="flex-1">
+<div id="container" class="card min-h-0 flex-1 overflow-hidden">
 </div>
 
 <script>
@@ -26,7 +19,10 @@
             value: file_content,
             fontSize: 14,
             language: "{{ language }}",
-            readOnly: {% if read_only %}true{% else %}false{% endif %}
+            readOnly: {% if read_only %}true{% else %}false{% endif %},
+            automaticLayout: true,
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false
         });
     });
 </script>

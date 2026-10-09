@@ -1,19 +1,44 @@
 {% extends "base.html.jinja" %}
 
-{% block contents %}
-<h1>Search</h1>
+{% import "icons.html.jinja" as icons %}
 
-<form hx-post="{{ url_for('search.search_post') }}" hx-target="#search-results">
-    <label for="format">Format:</label>
-    <select id="format" name="format" class="border-2">
-        <option value="json">JSON</option>
-        <option value="yaml">YAML</option>
-    </select>
-    <textarea id="query" name="query" class="border-2" cols="160" rows="10">{
+{% block title %}Search · Foreman{% endblock %}
+
+{% block contents %}
+<div class="mx-auto max-w-7xl space-y-6">
+    <div>
+        <h1 class="page-title">Search</h1>
+        <p class="mt-1 text-sm text-gray-500">
+            Find jobs with an R3 query on their metadata, e.g.
+            <code class="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs text-gray-700">{"tags": "galvani"}</code> or
+            <code class="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs text-gray-700">{"path": {"$glob": "ntt/*"}}</code>.
+        </p>
+    </div>
+
+    <form class="card" hx-post="{{ url_for('search.search_post') }}" hx-target="#search-results">
+        <div class="card-body space-y-3">
+            <label for="query" class="sr-only">Query</label>
+            <textarea id="query" name="query" rows="8" spellcheck="false"
+                class="input w-full font-mono"
+                onkeydown="if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') this.form.requestSubmit()">{
 
 }</textarea>
-    <button type="submit">Search</button>
-</form>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-2 text-sm text-gray-600">
+                    <label for="format">Format</label>
+                    <select id="format" name="format" class="input py-1">
+                        <option value="json">JSON</option>
+                        <option value="yaml">YAML</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="hidden text-xs text-gray-400 sm:inline">Ctrl+Enter</span>
+                    <button type="submit" class="btn btn-primary">{{ icons.icon("search") }}Search</button>
+                </div>
+            </div>
+        </div>
+    </form>
 
-<div id="search-results"></div>
+    <div id="search-results"></div>
+</div>
 {% endblock %}

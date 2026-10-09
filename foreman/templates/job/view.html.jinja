@@ -1,114 +1,170 @@
 {% extends "base.html.jinja" %}
 
 {% import "macros.html.jinja" as macros %}
+{% import "icons.html.jinja" as icons %}
+
+{% block title %}{{ job.name or job.virtual_path or job.id }} · Foreman{% endblock %}
 
 {% block sidebar %}
 {% include "job/sidebar.html.jinja" %}
 {% endblock %}
 
+{% macro stat(label, value, hint=None, tone="default") -%}
+<div class="rounded-lg px-4 py-3 ring-1 ring-inset {{ 'bg-red-50 ring-red-200' if tone == 'danger' else 'bg-gray-50 ring-gray-200' }}">
+    <dt class="text-xs font-medium uppercase tracking-wide {{ 'text-red-700' if tone == 'danger' else 'text-gray-500' }}">{{ label }}</dt>
+    <dd class="mt-1 text-xl font-semibold tabular-nums {{ 'text-red-900' if tone == 'danger' else 'text-gray-900' }}">{{ value }}</dd>
+    {% if hint %}<dd class="mt-0.5 text-xs {{ 'text-red-700' if tone == 'danger' else 'text-gray-500' }}">{{ hint }}</dd>{% endif %}
+</div>
+{%- endmacro %}
+
 {% block contents %}
 {% if open_file %}
 <div hx-get="{{ url_for('job.view_file', id=job.id, path=open_file) }}" hx-target="#contents" hx-trigger="load" hx-swap="innerHTML"></div>
 {% else %}
-<nav aria-label="breadcrumb">
-    <ol class="flex flex-row text-gray-600 text-sm">
-        <li><a href="/" class="underline text-sky-600 hover:no-underline hover:text-sky-400">Jobs</a>&nbsp;/&nbsp;</li>
-        <li aria-current="page">{{ job.id }}</li>
-    </ol>
-</nav>
+<div class="mx-auto max-w-5xl space-y-6">
+    <div>
+        {{ macros.breadcrumbs([("Jobs", url_for("job_list.view")), (job.id[:8], None)]) }}
+        {% set folder, _, leaf = (job.virtual_path or "").rpartition("/") %}
+        {% if folder and not job.name %}
+        <p class="mb-1 break-all text-sm text-gray-500">{{ folder }}/</p>
+        {% endif %}
+        <div class="flex flex-wrap items-center gap-3">
+            <h1 class="page-title min-w-0 [overflow-wrap:anywhere]">{{ job.name or leaf or job.id }}</h1>
+            {{ macros.status(job.status) }}
+        </div>
+        <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+            <span class="font-mono">{{ job.id }}</span>
+            {% if job.timestamp %}<span>Committed {{ job.timestamp.strftime("%Y-%m-%d %H:%M") }}</span>{% endif %}
+        </div>
+        {% if job.description %}
+        <p class="mt-3 max-w-3xl text-gray-700">{{ job.description }}</p>
+        {% endif %}
+    </div>
 
+    <section class="card" aria-labelledby="run-heading">
+        <div class="card-header">
+            <h2 id="run-heading" class="card-title">Run summary</h2>
+            {% if stats %}
+            <span class="text-xs text-gray-500">
+                Slurm job <span class="font-mono">{{ stats.last.job_id }}</span>{% if stats.last.partition %} · {{ stats.last.partition }}{% endif %}{% if stats.last.nodes and stats.last.nodes != "None assigned" %} · {{ stats.last.nodes }}{% endif %}
+            </span>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% if stats %}
+            <dl class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                {{ stat("Queued", stats.queued | duration, "so far" if stats.outcome == "queued" else ("submitted " ~ (stats.submit_delay | duration) ~ " after commit" if stats.submit_delay is not none else None)) }}
+                {% if stats.failed_after is not none %}
+                {{ stat("Failed after", stats.failed_after | duration, stats.outcome | capitalize ~ (", exit code " ~ stats.last.exit_code if stats.outcome == "failed" else ""), "danger") }}
+                {% else %}
+                {{ stat("Running for" if stats.outcome == "running" else "Ran for", stats.running | duration, "so far" if stats.outcome == "running" else None) }}
+                {% endif %}
+                {{ stat("Total", stats.total | duration, "since first submission") }}
+                {{ stat("Attempts", stats.attempts, (stats.preemptions ~ " preempted") if stats.preemptions else None) }}
+            </dl>
+            {% else %}
+            <p class="text-sm text-gray-500">
+                No Slurm records found for this job. It may not have been submitted yet, or it ran outside Slurm.
+            </p>
+            {% endif %}
+        </div>
+    </section>
 
-<section class="mb-12">
-    <h1 class="text-2xl mt-4 mb-8">
-        {{ job.name or job.id}}
-        {{ macros.status(job.status) }}
-    </h1>
+    <div class="grid items-start gap-6 lg:grid-cols-5">
+        <section class="card lg:col-span-3" aria-labelledby="timeline-heading">
+            <div class="card-header">
+                <h2 id="timeline-heading" class="card-title">Timeline</h2>
+            </div>
+            <ol class="card-body">
+                {% set vars = namespace(last_date=None) %}
+                {% for event in timeline %}
+                {% set date = event.datetime.strftime("%Y-%m-%d") %}
+                <li class="relative flex gap-4 {{ 'pb-5' if not loop.last }}">
+                    {% if not loop.last %}<span class="absolute left-[5px] top-4 h-full w-px bg-gray-200" aria-hidden="true"></span>{% endif %}
+                    {% set _, dot, pulse = macros.status_styles.get(event.status, ("", "bg-purple-500", False)) %}
+                    <span class="relative mt-1.5 flex h-[11px] w-[11px] shrink-0 items-center justify-center rounded-full bg-white ring-2 ring-white">
+                        {% if event.ongoing and pulse %}<span class="absolute h-full w-full animate-ping rounded-full opacity-75 {{ dot }}"></span>{% endif %}
+                        <span class="relative h-[11px] w-[11px] rounded-full {{ dot }}"></span>
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-baseline justify-between gap-x-4">
+                            <p class="text-sm font-medium text-gray-900">
+                                {{ event.description }}
+                                {% if event.slurm_job_id %}<span class="ml-1 font-mono text-xs font-normal text-gray-500">#{{ event.slurm_job_id }}</span>{% endif %}
+                            </p>
+                            <time class="whitespace-nowrap text-xs tabular-nums text-gray-500" datetime="{{ event.datetime.isoformat() }}">
+                                {% if vars.last_date != date %}{{ date }} {% set vars.last_date = date %}{% endif %}{{ event.datetime.strftime("%H:%M:%S") }}
+                            </time>
+                        </div>
+                        {% if event.duration is not none %}
+                        <p class="mt-0.5 text-xs text-gray-500">
+                            {{ event.status | capitalize }} for {{ event.duration | duration }}{% if event.ongoing %} so far{% endif %}
+                        </p>
+                        {% endif %}
+                    </div>
+                </li>
+                {% endfor %}
+            </ol>
+        </section>
 
-    {% if job.description %}
-        <p>{{ job.description }}</p>
-    {% endif %}
-</section>
+        <div class="space-y-6 lg:col-span-2">
+            <section class="card" aria-labelledby="details-heading">
+                <div class="card-header">
+                    <h2 id="details-heading" class="card-title">Details</h2>
+                </div>
+                <dl class="card-body space-y-4 text-sm">
+                    <div>
+                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Path</dt>
+                        <dd class="mt-1 flex items-start gap-2">
+                            <span class="min-w-0 break-all font-mono text-xs text-gray-700">{{ job.path }}</span>
+                            {{ macros.copy_button(job.path) }}
+                        </dd>
+                    </div>
+                    {% if job.virtual_path %}
+                    <div>
+                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Location</dt>
+                        <dd class="mt-1 break-all">
+                            <a class="link" href="{{ url_for('job_tree.view', path=job.virtual_path.rsplit('/', 1)[0] if '/' in job.virtual_path else '') }}">{{ job.virtual_path }}</a>
+                        </dd>
+                    </div>
+                    {% endif %}
+                    {% if job.origin %}
+                    <div>
+                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Origin</dt>
+                        <dd class="mt-1 break-all text-gray-700">{{ job.origin }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </section>
 
-
-<section class="mb-12">
-    <h2 class="text-xl px-2 mb-4">Metadata</h1>
-
-    <table class="text-m text-left rtl:text-right text-gray-500 dark:text-gray-400">
-        <tbody>
-            <tr>
-                <th class="align-top px-6 py-3 text-sm text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">Path</th>
-                <td class="align-top px-6 py-3">
-                    {{ job.path }}
-                    <button type="button" class="underline text-sky-600 hover:no-underline hover:text-sky-400"
-                    onclick="navigator.clipboard.writeText('{{ job.path }}')">Copy</button>
-                </td>
-            </tr>
-            <tr>
-                <th class="align-top px-6 py-3 text-sm text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">Tags</th>
-                <td class="align-top px-6 py-3">
-                    <ul class="list-unstyled">
-                        {% for tag in job.tags %}<li>{{ tag }}</li>{% endfor %}
-                    </ul>
-                </td>
-            </tr>
-            <tr>
-                <th class="align-top px-6 py-3 text-sm text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">Origin</th>
-                <td class="align-top px-6 py-3">{{ job.origin }}</td>
-            </tr>
-        </tbody>
-    </table>
-</section>
-
-
-<div>
-    <h2 class="text-xl px-2 mb-4">Timeline</h1>
-
-  <!-- https://flowbite.com/docs/components/tables/ -->
-  <table class="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
-      <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-          <tr>
-              <th scope="col" class="px-6 py-3">Date</th>
-              <th scope="col" class="px-6 py-3">Time</th>
-              <th scope="col" class="px-6 py-3">Duration</th>
-              <th scope="col" class="px-6 py-3">Status</th>
-              <th scope="col" class="px-6 py-3">Reason</th>
-          </tr>
-      </thead>
-  
-      <tbody>
-          <!-- Normal variables in jinja2 are cleared after each loop iteration. -->
-          {% set vars = namespace(last_date=None) %}
-          {% for event in timeline %}
-          <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
-              <td class="px-6 py-4">
-                  {% if vars.last_date != event.datetime.strftime("%Y-%m-%d") %}
-                      {% set vars.last_date = event.datetime.strftime("%Y-%m-%d") %}
-                      {{ event.datetime.strftime("%Y-%m-%d") }}
-                  {% endif %}
-              </td>
-              <td class="px-6 py-4">{{ event.datetime.strftime("%H:%M:%S") }}</td>
-              <td class="px-6 py-4">{{ event.duration }}</td>
-              <td class="px-6 py-4">{{ macros.status(event.status) }}</td>
-              <td class="px-6 py-4">
-                  {% if event.reason == "committed" %}
-                      Job {{ short_id }} was committed to R3.
-                  {% elif event.reason == "submitted" %}
-                      Slurm job {{ event.slurm_job_id }} was submitted.
-                  {% elif event.reason == "preempted" %}
-                      Slurm job {{ event.slurm_job_id }} was preempted.
-                  {% elif event.status == "running" %}
-                      Slurm job {{ event.slurm_job_id }} was started.
-                  {% elif event.status == "done" %}
-                      Slurm job {{ event.slurm_job_id }} completed.
-                  {% else %}
-                      {% if event.reason %}{{ event.reason }}{% endif %}
-                      {% if event.slurm_job_id %} slurm_job_id = {{ event.slurm_job_id }}{% endif %}
-                  {% endif %}
-              </td>
-          </tr>
-          {% endfor %}
-      </tbody>
-  </table>
+            <section class="card" aria-labelledby="tags-heading">
+                <div class="card-header">
+                    <h2 id="tags-heading" class="card-title">Tags</h2>
+                    <span class="text-xs text-gray-500">{{ job.tags | length }}</span>
+                </div>
+                <div class="card-body">
+                    {% if job.tags %}
+                    <div class="flex flex-wrap gap-1.5">
+                        {% for text in job.leaf_tags %}{{ macros.tag(text) }}{% endfor %}
+                    </div>
+                    {% set parents = job.tags | reject("in", job.leaf_tags) | list %}
+                    {% if parents %}
+                    <details class="group mt-3">
+                        <summary class="cursor-pointer select-none text-xs font-medium text-gray-500 hover:text-gray-700">
+                            {{ parents | length }} parent tag{{ "s" if parents | length != 1 }}
+                        </summary>
+                        <div class="mt-2 flex flex-wrap gap-1.5">
+                            {% for text in parents %}{{ macros.tag(text) }}{% endfor %}
+                        </div>
+                    </details>
+                    {% endif %}
+                    {% else %}
+                    <p class="text-sm text-gray-500">No tags</p>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+    </div>
 </div>
 {% endif %}
 {% endblock %}

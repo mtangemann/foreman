@@ -1,45 +1,31 @@
-<aside id="logo-sidebar" class="fixed top-0 left-0 z-40 w-64 h-screen pt-20 transition-transform -translate-x-full bg-white border-r border-gray-200 sm:translate-x-0 dark:bg-gray-800 dark:border-gray-700" aria-label="Sidebar">
-    <div class="h-full px-3 pb-4 overflow-y-auto bg-white dark:bg-gray-800">
-       <ul class="space-y-2 font-medium">
-          <li>
-             <a href="/tensorboard/open/{{ job.uuid }}" targt="_blank" class="flex items-center p-2 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
-                <svg class="flex-shrink-0 w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 32 32">
-                    <!-- https://github.com/tensorflow/tensorboard/blob/94129a892f8d927dd5ae65ab258beda26f1d8841/tensorboard/logo/logo.svg -->
-                    <defs><style>.cls-1{fill:url(#linear-gradient);}.cls-2{fill:url(#linear-gradient-2);}.cls-3{fill:url(#linear-gradient-3);}.cls-4{fill:url(#linear-gradient-4);}.cls-5{fill:url(#linear-gradient-5);}</style><linearGradient id="linear-gradient" x1="2.22" y1="6.89" x2="29.41" y2="6.89" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ff6f00"/><stop offset="1" stop-color="#ffa800"/></linearGradient><linearGradient id="linear-gradient-2" x1="3.59" y1="23.72" x2="31.28" y2="23.72" xlink:href="#linear-gradient"/><linearGradient id="linear-gradient-3" x1="3.84" y1="21.45" x2="30.99" y2="21.45" xlink:href="#linear-gradient"/><linearGradient id="linear-gradient-4" x1="3.1" y1="25.1" x2="30.64" y2="25.1" xlink:href="#linear-gradient"/><linearGradient id="linear-gradient-5" x1="-2.35" y1="7.48" x2="25.76" y2="7.48" gradientTransform="translate(5.6 8.03) rotate(1.12)" xlink:href="#linear-gradient"/></defs><title>TF_</title><g id="Layer_2" data-name="Layer 2"><polygon class="cls-1" points="28.41 13.7 30.12 12.72 30.12 8.22 16 0.07 4.56 6.67 6.26 7.65 16 2.04 28.41 9.2 28.41 13.7"/><polygon class="cls-2" points="17.55 31.81 22.3 29.07 22.3 15.63 17.55 18.37 17.55 31.81"/><polygon class="cls-3" points="25.38 18.36 25.38 27.27 30.13 24.53 30.13 15.62 25.38 18.36"/><polygon class="cls-4" points="4.57 18.27 1.9 19.13 1.9 24.69 14.47 31.93 14.47 20.64 9.33 25.56 4.57 18.27"/><polygon class="cls-5" points="2.04 8.34 1.87 17.04 5.34 16 9.53 22.68 14.42 18.18 14.47 15.82 2.04 8.34"/></g>
-                </svg>
-                <span class="ms-3">Tensorboard</span>
-             </a>
-          </li>
-          {% if job.has_report %}
-          <li>
-             <a href="{{ url_for('job.view', id=job.id, file='/output/report.html') }}" class="flex items-center p-2 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
-                <!-- Flowbite icon "edit" (document + pen): https://flowbite.com/icons/ -->
-                <svg class="flex-shrink-0 w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M5 5V.13a2.96 2.96 0 0 0-1.293.749L.879 3.707A2.96 2.96 0 0 0 .13 5H5Z"/>
-                    <path d="M6.737 11.061a2.961 2.961 0 0 1 .81-1.515l6.117-6.116A4.839 4.839 0 0 1 16 2.141V2a1.97 1.97 0 0 0-1.933-2H7v5a2 2 0 0 1-2 2H0v11a1.969 1.969 0 0 0 1.933 2h12.134A1.97 1.97 0 0 0 16 18v-3.093l-1.546 1.546c-.413.413-.94.695-1.513.81l-3.4.679a2.947 2.947 0 0 1-1.85-.12 2.96 2.96 0 0 1-1.635-3.257l.681-3.397Z"/>
-                    <path d="M8.961 16a.93.93 0 0 0 .189-.019l3.4-.679a.961.961 0 0 0 .49-.263l6.118-6.117a2.884 2.884 0 0 0-4.079-4.078l-6.117 6.117a.96.96 0 0 0-.263.491l-.679 3.4A.961.961 0 0 0 8.961 16Z"/>
-                </svg>
-                <span class="ms-3">Report</span>
-             </a>
-          </li>
-          {% endif %}
-          <li>
-             <a hx-get="{{ url_for('job.dependencies', id=job.id) }}" hx-target="#contents" hx-swap="innerHTML" class="flex items-center p-2 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group cursor-pointer">
-                <!-- Custom icon: dependency nodes -->
-                <svg class="flex-shrink-0 w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path stroke="currentColor" stroke-width="1.5" fill="none" d="M5 10 L14 5 M5 10 L14 15"/>
-                    <circle cx="5" cy="10" r="2.5"/>
-                    <circle cx="15" cy="4" r="2.5"/>
-                    <circle cx="15" cy="16" r="2.5"/>
-                </svg>
-                <span class="ms-3">Dependencies</span>
-             </a>
-          </li>
-       </ul>
-       <div class="pt-4 mt-4 space-y-2 font-medium border-t border-gray-200 dark:border-gray-700">
-            <h2>Files</h2>
-           <section id="files" hx-trigger="load" hx-get="{{ url_for('job.view_directory', id=job.id) }}">
-           </section>
+{% import "icons.html.jinja" as icons %}
+{% set item = "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer" %}
+<aside class="hidden w-64 shrink-0 overflow-y-auto border-r border-gray-200 bg-white md:block" aria-label="Job">
+    <div class="space-y-6 px-3 py-5">
+        <ul class="space-y-0.5">
+            <li>
+                <a href="/tensorboard/open/{{ job.id }}" target="_blank" class="{{ item }}">
+                    {{ icons.icon("chart", "h-5 w-5 text-gray-400") }}TensorBoard
+                    {{ icons.icon("external", "ml-auto h-3.5 w-3.5 text-gray-400") }}
+                </a>
+            </li>
+            {% if job.has_report %}
+            <li>
+                <a href="{{ url_for('job.view', id=job.id, file='/output/report.html') }}" class="{{ item }}">
+                    {{ icons.icon("report", "h-5 w-5 text-gray-400") }}Report
+                </a>
+            </li>
+            {% endif %}
+            <li>
+                <a hx-get="{{ url_for('job.dependencies', id=job.id) }}" hx-target="#contents" hx-swap="innerHTML" class="{{ item }}">
+                    {{ icons.icon("share", "h-5 w-5 text-gray-400") }}Dependencies
+                </a>
+            </li>
+        </ul>
+
+        <div>
+            <h2 class="mb-2 px-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500">Files</h2>
+            <section id="files" hx-trigger="load" hx-get="{{ url_for('job.view_directory', id=job.id) }}"></section>
         </div>
     </div>
 </aside>
