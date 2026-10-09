@@ -4,27 +4,31 @@ Job blueprint.
 Displays information about individual jobs.
 """
 import base64
-from datetime import datetime, timedelta
+from datetime import datetime
 
-import r3
-from executor import ExternalCommandFailed
-from executor.ssh.client import RemoteCommand
 from flask import Blueprint, render_template, request, send_from_directory, url_for
 
+from foreman.job_stats import build_timeline, compute_stats, format_duration
 from foreman.r3_extension import Repository
 
-SLURM_DATE_FORMAT = r"%Y-%m-%dT%H:%M:%S"
-
 job = Blueprint("job", __name__, url_prefix="/job")
+job.add_app_template_filter(format_duration, "duration")
 
 
 @job.route("/view/<id>")
 def view(id: str):
     repository = Repository.from_environment()
     job = repository.get(id)
-    timeline = _get_job_timeline(job.r3_job)
-    open_file = request.args.get("file")
-    return render_template("job/view.html.jinja", job=job, timeline=timeline, open_file=open_file)
+    records = job.slurm_records
+    now = datetime.now()
+    return render_template(
+        "job/view.html.jinja",
+        job=job,
+        records=records,
+        stats=compute_stats(job.timestamp, records, now),
+        timeline=build_timeline(job.timestamp, records, now),
+        open_file=request.args.get("file"),
+    )
 
 
 @job.route("/view/<id>/dependencies")
@@ -161,88 +165,3 @@ def view_file(id: str, path: str = ""):
 def file_contents(path):
     repository = Repository.from_environment()
     return send_from_directory(repository.r3_repository.path / "jobs", path)
-
-
-def _get_job_timeline(job: r3.Job):
-    starttime = (job.timestamp.date() - timedelta(days=1)).isoformat()
-
-    events_by_slurm_job = dict()
-
-    for host in ["slurm2", "galvani"]:
-        command = RemoteCommand(
-            host,
-            rf"sacct --name {job.path.name} --starttime {starttime} --duplicate -o 'JobId,State,Submit,Start,End' --parsable2",  # noqa: E501
-            capture=True,
-        )
-
-        try:
-            command.start()
-        except ExternalCommandFailed:
-            continue
-
-        for line in command.output.split("\n")[1:]:
-            if len(line) > 1:
-                job_id, state, submit, start, end = line.split("|")
-
-                if "." in job_id:
-                    continue
-
-                if job_id not in events_by_slurm_job:
-                    events_by_slurm_job[job_id] = [{
-                        "status": "queued",
-                        "datetime": datetime.strptime(submit, SLURM_DATE_FORMAT),
-                        "reason": "submitted",
-                    }]
-
-                if state == "PREEMPTED":
-                    events_by_slurm_job[job_id].append({
-                        "status": "running",
-                        "datetime": datetime.strptime(start, SLURM_DATE_FORMAT),
-                        "reason": "",
-                    })
-                    events_by_slurm_job[job_id].append({
-                        "status": "queued",
-                        "datetime": datetime.strptime(end, SLURM_DATE_FORMAT),
-                        "reason": "preempted",
-                    })
-
-                elif state == "COMPLETED":
-                    events_by_slurm_job[job_id].append({
-                        "status": "running",
-                        "datetime": datetime.strptime(start, SLURM_DATE_FORMAT),
-                        "reason": "",
-                    })
-                    events_by_slurm_job[job_id].append({
-                        "status": "done",
-                        "datetime": datetime.strptime(end, SLURM_DATE_FORMAT),
-                        "reason": "",
-                    })
-
-                elif state == "RUNNING":
-                    events_by_slurm_job[job_id].append({
-                        "status": "running",
-                        "datetime": datetime.strptime(start, SLURM_DATE_FORMAT),
-                        "reason": "",
-                    })
-
-    timeline = [{
-        "status": "ready",
-        "datetime": job.timestamp,
-        "reason": "committed",
-        "slurm_job_id": None,
-    }]
-
-    for slurm_job_id, events in events_by_slurm_job.items():
-        for event in events:
-            timeline.append({
-                "status": event["status"],
-                "datetime": event["datetime"],
-                "reason": event["reason"],
-                "slurm_job_id": slurm_job_id,
-            })
-
-    # Add durations
-    for i in range(len(timeline) - 1):
-        timeline[i]["duration"] = timeline[i + 1]["datetime"] - timeline[i]["datetime"]
-
-    return timeline
