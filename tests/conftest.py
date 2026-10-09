@@ -4,13 +4,15 @@ import pytest
 import r3
 import yaml
 
+from foreman import settings
 from foreman.r3_extension import Repository
 
 
 @pytest.fixture(autouse=True)
 def isolated_settings(tmp_path, monkeypatch):
-    """Keep tests independent of a foreman.conf in the developer's checkout."""
+    """Keep tests independent of foreman.conf and config_local.py in the checkout."""
     monkeypatch.setenv("FOREMAN_CONFIG", str(tmp_path / "foreman.conf"))
+    monkeypatch.setattr(settings, "LOCAL_CONFIG", tmp_path / "config_local.py")
 
 
 @pytest.fixture

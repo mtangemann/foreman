@@ -8,12 +8,8 @@ import yaml
 from flask import Flask
 
 from foreman import repositories
-from foreman.job import job as job_blueprint
-from foreman.job_list import job_list
-from foreman.job_tree import job_tree
+from foreman.blueprints import BLUEPRINTS
 from foreman.repositories import branches_containing, repository_links
-from foreman.search import search
-from foreman.settings_page import settings_page
 from foreman.templating import autoescape
 
 COMMIT = "bb16a40e46e615a7d57206072703586dd673c460"
@@ -110,7 +106,7 @@ def app(repo, monkeypatch):
     )
     app.jinja_env.autoescape = autoescape
     app.config.update(TESTING=True, SLURM_HOSTS=[], SLURM_CACHE_EXPIRATION=0)
-    for blueprint in (job_blueprint, job_list, job_tree, search, settings_page):
+    for blueprint in BLUEPRINTS:
         app.register_blueprint(blueprint)
     return app
 

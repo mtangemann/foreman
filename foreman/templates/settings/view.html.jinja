@@ -28,6 +28,7 @@
 
     <form id="settings-form" hx-post="{{ url_for('settings_page.save') }}" hx-headers='{"X-Foreman-Request": "settings"}'
         hx-select="#settings-form" hx-target="#settings-form" hx-swap="outerHTML"
+        hx-disinherit="*"
         hx-on::before-swap="if ([400, 500].includes(event.detail.xhr.status)) { event.detail.shouldSwap = true; event.detail.isError = false; }"
         class="space-y-6">
         {% if errors %}
@@ -41,7 +42,15 @@
         <section class="card" aria-labelledby="section-{{ section }}">
             <div class="card-header">
                 <h2 id="section-{{ section }}" class="card-title">{{ title }}</h2>
+                {% if section == "slurm" %}
+                <button type="button" class="btn btn-secondary btn-sm" hx-post="{{ url_for('settings_page.check_slurm_hosts') }}"
+                    hx-headers='{"X-Foreman-Request": "settings"}' hx-target="#host-check" hx-swap="innerHTML"
+                    hx-indicator="#host-check" title="Run squeue --version on each saved host">
+                    {{ icons.icon("check") }}Check hosts
+                </button>
+                {% endif %}
             </div>
+            {% if section == "slurm" %}<div id="host-check" aria-live="polite"></div>{% endif %}
             <div class="divide-y divide-gray-100">
                 {% for setting in settings if setting.section == section %}
                 {% set value = values[setting.key] %}
@@ -62,6 +71,10 @@
                         <span class="h-6 w-11 rounded-full bg-gray-200 transition-colors peer-checked:bg-sky-600 peer-focus-visible:ring-2 peer-focus-visible:ring-sky-500 peer-focus-visible:ring-offset-2"></span>
                         <span class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5"></span>
                     </label>
+                    {% elif setting.kind == "text" %}
+                    <input id="{{ setting.key }}" type="text" name="{{ setting.key }}" spellcheck="false"
+                        value="{{ value if value is string else value | join(', ') }}"
+                        aria-describedby="{{ setting.key }}-help" class="input w-64 shrink-0 font-mono text-xs">
                     {% else %}
                     <input id="{{ setting.key }}" type="number" name="{{ setting.key }}" value="{{ value }}"
                         {% if setting.minimum is not none %}min="{{ setting.minimum }}"{% endif %}

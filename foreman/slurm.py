@@ -52,6 +52,174 @@ STATUS_BY_SLURM_STATE = {
 }
 
 
+# Columns of the job queue page that can be switched on or off, in display order.
+QUEUE_COLUMNS = {
+    "state": "State",
+    "partition": "Partition",
+    "submitted": "Submitted",
+    "start": "Start",
+    "elapsed": "Elapsed",
+    "end": "Expected end",
+    "resources": "Resources",
+    "nodelist": "Nodes",
+    "priority": "Priority",
+    "user": "User",
+    "account": "Account",
+    "host": "Host",
+}
+
+# squeue fields, separated by a character that job names and paths never contain.
+_QUEUE_SEPARATOR = "\x1f"
+_QUEUE_FIELDS = {
+    "job_id": "%i", "name": "%j", "state": "%T", "reason": "%r", "partition": "%P",
+    "submit": "%V", "start": "%S", "end": "%e", "elapsed": "%M",
+    "time_limit": "%l", "nodes": "%D", "nodelist": "%N", "cpus": "%C",
+    "tres": "%b", "priority": "%Q", "user": "%u", "account": "%a", "qos": "%q",
+    "work_dir": "%Z",
+}
+
+
+@dataclass(frozen=True)
+class QueueJob:
+    """A queued or running Slurm job, as reported by squeue."""
+
+    host: str
+    job_id: str
+    name: str
+    state: str
+    # Why a pending job waits (e.g. "Priority"), "None" otherwise.
+    reason: str
+    partition: str
+    submit: Optional[datetime]
+    # Actual start, or Slurm's estimate for a pending job (None if unknown).
+    start: Optional[datetime]
+    end: Optional[datetime]
+    elapsed: Optional[timedelta]
+    time_limit: Optional[timedelta]
+    nodes: int
+    nodelist: str
+    cpus: int
+    gpus: int
+    priority: int
+    user: str
+    account: str
+    qos: str
+    work_dir: str
+
+    @property
+    def keys(self) -> set[str]:
+        """Returns the names this job can be matched to an R3 job by."""
+        return {self.name, PurePosixPath(self.work_dir).name} - {""}
+
+    @property
+    def is_pending(self) -> bool:
+        return self.state == "PENDING"
+
+    @property
+    def status(self) -> str:
+        return STATUS_BY_SLURM_STATE.get(self.state, self.state.lower())
+
+    @property
+    def progress(self) -> Optional[float]:
+        """Returns the fraction of the time limit used, if there is a limit."""
+        if not self.elapsed or not self.time_limit:
+            return None
+        return min(self.elapsed / self.time_limit, 1.0)
+
+
+def parse_duration(value: str) -> Optional[timedelta]:
+    """Parses a Slurm duration such as `5:47:13`, `24:55` or `3-00:00:00`."""
+    days, _, clock = value.strip().rpartition("-")
+    parts = clock.split(":")
+    if not 1 <= len(parts) <= 3 or not all(part.isdigit() for part in parts):
+        return None  # "UNLIMITED", "INVALID", "N/A", ...
+    if days and not days.isdigit():
+        return None
+    seconds = 0
+    for part in parts:
+        seconds = seconds * 60 + int(part)
+    return timedelta(days=int(days or 0), seconds=seconds)
+
+
+def _count_gpus(tres: str, nodes: int) -> int:
+    """Counts GPUs in a per-node TRES/GRES string, e.g. `gres/gpu:a100:2`."""
+    count = 0
+    for entry in tres.split(","):
+        if "gpu" not in entry:
+            continue
+        last = entry.rsplit(":", 1)[-1].split("(")[0]
+        count += int(last) if last.isdigit() else 1
+    return count * max(nodes, 1)
+
+
+def _int(value: str) -> int:
+    try:
+        return int(value)
+    except ValueError:
+        return 0
+
+
+def queue_format() -> str:
+    """Returns the squeue output format for `parse_queue`."""
+    return _QUEUE_SEPARATOR.join(_QUEUE_FIELDS.values())
+
+
+def parse_queue(output: str, host: str) -> List[QueueJob]:
+    """Parses `squeue --noheader -o <queue_format()>` output."""
+    jobs = []
+    for line in output.splitlines():
+        fields = line.split(_QUEUE_SEPARATOR)
+        if len(fields) != len(_QUEUE_FIELDS):
+            continue
+        values = dict(zip(_QUEUE_FIELDS, fields, strict=True))
+        nodes = _int(values["nodes"])
+        jobs.append(QueueJob(
+            host=host,
+            job_id=values["job_id"],
+            name=values["name"],
+            state=values["state"],
+            reason=values["reason"],
+            partition=values["partition"],
+            submit=_parse_date(values["submit"]),
+            start=_parse_date(values["start"]),
+            end=_parse_date(values["end"]),
+            elapsed=parse_duration(values["elapsed"]),
+            time_limit=parse_duration(values["time_limit"]),
+            nodes=nodes,
+            nodelist=values["nodelist"],
+            cpus=_int(values["cpus"]),
+            gpus=_count_gpus(values["tres"], nodes),
+            priority=_int(values["priority"]),
+            user=values["user"],
+            account=values["account"],
+            qos=values["qos"],
+            work_dir=values["work_dir"],
+        ))
+    return jobs
+
+
+def check_host(host: str) -> tuple[bool, str]:
+    """Runs `squeue --version` on a host; returns success and a message."""
+    args = ["squeue", "--version"]
+    if host == LOCAL_HOST:
+        try:
+            result = subprocess.run(
+                args, capture_output=True, text=True, timeout=30, check=True,
+            )
+        except subprocess.CalledProcessError as error:
+            return False, (error.stderr or str(error)).strip()
+        except (OSError, subprocess.SubprocessError) as error:
+            return False, str(error)
+        return True, result.stdout.strip()
+
+    command = RemoteCommand(host, shlex.join(args), capture=True, capture_stderr=True)
+    try:
+        command.start()
+    except ExternalCommandFailed as error:
+        return False, (command.stderr or str(error)).strip()
+    return True, command.output.strip()
+
+
 def get_slurm():
     if "slurm" not in flask.g:
         flask.g.slurm = Slurm(
@@ -187,6 +355,7 @@ class Slurm:
             memoize = CACHE.memoize(expire=cache_experiation)
             self._get_jobs_from_host = memoize(self._get_jobs_from_host)  # type: ignore
             self._get_history_from_host = memoize(self._get_history_from_host)  # type: ignore
+            self._get_queue_from_host = memoize(self._get_queue_from_host)  # type: ignore
 
     @property
     def cache_experation(self) -> int:
@@ -232,6 +401,21 @@ class Slurm:
         if since is not None and since > default_since:
             since = default_since  # reuse the (cached) default history
         return self.get_history(since).get(job_id, [])
+
+    def get_queue(self, all_users: bool = False) -> List[QueueJob]:
+        """Returns queued and running jobs on all hosts (own jobs by default)."""
+        jobs = []
+        for host in self.hosts:
+            jobs.extend(self._get_queue_from_host(host, all_users))
+        return jobs
+
+    def _get_queue_from_host(self, host: str, all_users: bool) -> List[QueueJob]:
+        LOGGER.info("Getting the slurm queue from %s.", host)
+        args = ["squeue", "--noheader", "-o", queue_format()]
+        if not all_users:
+            args.insert(1, "--me")
+        output = run_command(host, args)
+        return parse_queue(output, host) if output is not None else []
 
     def _get_jobs_from_host(self, host: str) -> Dict[str, str]:
         """Returns a dictionary of slurm jobs from a host."""

@@ -1,0 +1,114 @@
+{% extends "base.html.jinja" %}
+
+{% import "icons.html.jinja" as icons %}
+
+{% block title %}Job queue · Foreman{% endblock %}
+
+{% block contents %}
+{% set scope = config.get("QUEUE_SCOPE", "me") %}
+{% set refresh = config.get("QUEUE_REFRESH", 0) %}
+<div class="mx-auto max-w-7xl space-y-6">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <h1 class="page-title">Job queue</h1>
+            <p class="mt-1 text-sm text-gray-500">
+                From <span class="font-mono text-xs">squeue</span> on {{ hosts | join(", ") or "no hosts" }}{% if refresh %}, updated every {{ refresh }}s{% endif %}.
+            </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <label for="queue-filter" class="sr-only">Filter jobs</label>
+            <input id="queue-filter" type="search" placeholder="Filter jobs…" class="input w-56" oninput="filterQueue()">
+
+            {# Switching whose jobs are shown keeps the other queue settings. #}
+            <form hx-post="{{ url_for('job_queue.save_settings') }}" hx-headers='{"X-Foreman-Request": "queue"}'
+                hx-target="#contents" hx-select="#contents" hx-swap="outerHTML" hx-disinherit="*"
+                class="inline-flex rounded-md bg-gray-100 p-0.5" role="group" aria-label="Whose jobs">
+                {% for column in config.get("QUEUE_COLUMNS", []) %}<input type="hidden" name="QUEUE_COLUMNS" value="{{ column }}">{% endfor %}
+                <input type="hidden" name="QUEUE_REFRESH" value="{{ refresh }}">
+                {% for value, label in [("me", "My jobs"), ("all", "All users")] %}
+                <button type="submit" name="QUEUE_SCOPE" value="{{ value }}" aria-pressed="{{ (scope == value) | lower }}"
+                    class="rounded px-3 py-1 text-xs font-medium {{ 'bg-white text-gray-900 shadow-sm' if scope == value else 'text-gray-600 hover:text-gray-900' }}">{{ label }}</button>
+                {% endfor %}
+            </form>
+
+            <button type="button" class="btn btn-secondary" hx-get="{{ url_for('job_queue.jobs') }}" hx-target="#queue-jobs" title="Refresh now">
+                {{ icons.icon("arrow-path") }}<span class="hidden sm:inline">Refresh</span>
+            </button>
+            <button type="button" class="btn btn-secondary" popovertarget="queue-customize">
+                {{ icons.icon("cog") }}Customize
+            </button>
+        </div>
+    </div>
+
+    {% if errors %}
+    <div role="alert" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <p class="font-medium">The queue settings were not saved:</p>
+        <ul class="mt-1 list-inside list-disc">{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul>
+    </div>
+    {% elif saved %}
+    <p role="status" class="flex items-center gap-1 text-sm font-medium text-emerald-700">{{ icons.icon("check") }}Queue settings saved</p>
+    {% endif %}
+
+    <div id="queue-jobs" {% if refresh %}hx-get="{{ url_for('job_queue.jobs') }}" hx-trigger="every {{ refresh }}s"{% endif %}>
+        {% include "job_queue/_jobs.html.jinja" %}
+    </div>
+</div>
+
+<div id="queue-customize" popover
+    class="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-xl border border-gray-200 bg-white p-0 text-left shadow-xl backdrop:bg-gray-900/30">
+    <form hx-post="{{ url_for('job_queue.save_settings') }}" hx-headers='{"X-Foreman-Request": "queue"}'
+        hx-target="#contents" hx-select="#contents" hx-swap="outerHTML">
+        <div class="card-header">
+            <h2 class="card-title">Customize the job queue</h2>
+            <button type="button" popovertarget="queue-customize" popovertargetaction="hide" class="btn btn-ghost btn-sm" aria-label="Close">{{ icons.icon("x") }}</button>
+        </div>
+        <div class="card-body space-y-5">
+            <fieldset>
+                <legend class="text-sm font-medium text-gray-900">Columns</legend>
+                <div class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm text-gray-700">
+                    {% for column, label in all_columns.items() %}
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" name="QUEUE_COLUMNS" value="{{ column }}" {% if column in columns %}checked{% endif %}
+                            class="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500">{{ label }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend class="text-sm font-medium text-gray-900">Show jobs of</legend>
+                <div class="mt-2 flex gap-4 text-sm text-gray-700">
+                    {% for value, label in [("me", "Me"), ("all", "All users")] %}
+                    <label class="flex items-center gap-2">
+                        <input type="radio" name="QUEUE_SCOPE" value="{{ value }}" {% if scope == value %}checked{% endif %}
+                            class="h-4 w-4 border-gray-300 text-sky-600 focus:ring-sky-500">{{ label }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </fieldset>
+            <div class="flex items-center justify-between gap-4">
+                <label for="QUEUE_REFRESH" class="text-sm font-medium text-gray-900">
+                    Refresh every (seconds)
+                    <span class="block text-xs font-normal text-gray-500">0 to update only on reload.</span>
+                </label>
+                <input id="QUEUE_REFRESH" type="number" name="QUEUE_REFRESH" min="0" max="3600" value="{{ refresh }}" class="input w-24 text-right tabular-nums">
+            </div>
+        </div>
+        <div class="flex justify-end gap-2 rounded-b-xl border-t border-gray-100 bg-gray-50 px-5 py-3">
+            <button type="button" popovertarget="queue-customize" popovertargetaction="hide" class="btn btn-secondary">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Hide rows not matching the filter; reapplied after each refresh.
+    function filterQueue() {
+        const input = document.getElementById('queue-filter');
+        const text = input ? input.value.trim().toLowerCase() : '';
+        document.querySelectorAll('#queue-jobs tbody tr[data-filter]').forEach(function (row) {
+            row.hidden = text !== '' && !row.dataset.filter.includes(text);
+        });
+    }
+    document.body.addEventListener('htmx:afterSwap', filterQueue);
+</script>
+{% endblock %}

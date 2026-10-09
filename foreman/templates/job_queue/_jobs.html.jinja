@@ -1,0 +1,111 @@
+{% import "macros.html.jinja" as macros %}
+
+{% macro when(moment, past_suffix="ago") -%}
+{% if moment is none %}<span class="text-gray-400">Unknown</span>
+{%- else -%}
+<time datetime="{{ moment.isoformat() }}" title="{{ moment.strftime('%Y-%m-%d %H:%M:%S') }}">
+    {%- if moment > now %}in {{ (moment - now) | duration }}{% else %}{{ (now - moment) | duration }} {{ past_suffix }}{% endif -%}
+</time>
+{%- endif %}
+{%- endmacro %}
+
+{% macro cell(column, job) -%}
+{% if column == "state" %}
+    {% if job.is_pending %}
+    <span class="text-gray-700" title="{{ job.reason }}">{{ reasons.get(job.reason, job.reason) }}</span>
+    {% else %}{{ macros.status(job.status) }}{% endif %}
+{% elif column == "partition" %}
+    <span class="break-words">{{ job.partition | replace(",", ", ") }}</span>
+{% elif column == "submitted" %}{{ when(job.submit) }}
+{% elif column == "start" %}
+    {% if job.is_pending %}<span class="text-gray-500">est.</span> {% endif %}{{ when(job.start) }}
+{% elif column == "elapsed" %}
+    {% if job.is_pending %}<span class="text-gray-400">–</span>
+    {% else %}
+    <div class="min-w-[8rem]">
+        <div class="tabular-nums">{{ job.elapsed | duration }}<span class="text-gray-400"> / {{ job.time_limit | duration if job.time_limit else "no limit" }}</span></div>
+        {% if job.progress is not none %}
+        <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-100" role="progressbar"
+            aria-valuenow="{{ (job.progress * 100) | round | int }}" aria-valuemin="0" aria-valuemax="100" aria-label="Time limit used">
+            <div class="h-full rounded-full {{ 'bg-orange-500' if job.progress > 0.9 else 'bg-sky-500' }}" style="width: {{ (job.progress * 100) | round(1) }}%"></div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+{% elif column == "end" %}{{ when(job.end, "ago") }}
+{% elif column == "resources" %}
+    <span class="whitespace-nowrap">
+        {{ job.nodes }} node{{ "s" if job.nodes != 1 }} · {{ job.cpus }} CPUs{% if job.gpus %} · <span class="font-medium text-gray-900">{{ job.gpus }} GPU{{ "s" if job.gpus != 1 }}</span>{% endif %}
+    </span>
+{% elif column == "nodelist" %}<span class="font-mono text-xs">{{ job.nodelist or "–" }}</span>
+{% elif column == "priority" %}<span class="tabular-nums">{{ job.priority }}</span>
+{% elif column == "user" %}{{ job.user }}
+{% elif column == "account" %}{{ job.account }}<span class="text-gray-400"> · {{ job.qos }}</span>
+{% elif column == "host" %}<span class="font-mono text-xs">{{ job.host }}</span>
+{% endif %}
+{%- endmacro %}
+
+{% macro table(jobs, title, empty) -%}
+<section class="card overflow-hidden" aria-label="{{ title }}">
+    <div class="card-header">
+        <h2 class="card-title">{{ title }} <span class="ml-1 text-xs font-normal text-gray-500">{{ jobs | length }}</span></h2>
+    </div>
+    {% if jobs %}
+    <div class="overflow-x-auto">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Job</th>
+                    {% for column in columns %}<th>{{ all_columns[column] }}</th>{% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for job in jobs %}
+                {% set r3 = r3_jobs.get(job.job_id) %}
+                <tr data-filter="{{ [job.job_id, job.name, job.user, job.partition, job.state, job.reason, job.nodelist, r3.name if r3 else ''] | join(' ') | lower }}">
+                    <td class="max-w-xs">
+                        {% if r3 %}
+                        <a href="{{ url_for('job.view', id=r3.id) }}" class="link block [overflow-wrap:anywhere]" title="{{ r3.path }}">{{ r3.name }}</a>
+                        <span class="text-xs text-gray-500">{{ job.name }} · <span class="font-mono">#{{ job.job_id }}</span></span>
+                        {% else %}
+                        <span class="block font-medium text-gray-900 [overflow-wrap:anywhere]">{{ job.name }}</span>
+                        <span class="font-mono text-xs text-gray-500">#{{ job.job_id }}</span>
+                        {% endif %}
+                    </td>
+                    {% for column in columns %}<td>{{ cell(column, job) }}</td>{% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="card-body text-sm text-gray-500">{{ empty }}</p>
+    {% endif %}
+</section>
+{%- endmacro %}
+
+<div class="space-y-6">
+    <dl class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {% for label, value, hint in [
+            ("Running", running | length, (gpus_running ~ " GPUs in use") if gpus_running else None),
+            ("Pending", pending | length, (gpus_pending ~ " GPUs requested") if gpus_pending else None),
+            ("Next start", None, None),
+            ("Users" if config.get("QUEUE_SCOPE") == "all" else "Updated", users if config.get("QUEUE_SCOPE") == "all" else now.strftime("%H:%M:%S"), None),
+        ] %}
+        <div class="card px-4 py-3">
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">{{ label }}</dt>
+            <dd class="mt-1 text-xl font-semibold tabular-nums text-gray-900">
+                {% if label == "Next start" %}
+                {% set next = pending | selectattr("start") | map(attribute="start") | select("gt", now) | first %}
+                {% if next %}{{ (next - now) | duration }}{% else %}–{% endif %}
+                {% else %}{{ value }}{% endif %}
+            </dd>
+            {% if hint %}<dd class="mt-0.5 text-xs text-gray-500">{{ hint }}</dd>
+            {% elif label == "Next start" %}<dd class="mt-0.5 text-xs text-gray-500">Slurm's estimate for a pending job</dd>{% endif %}
+        </div>
+        {% endfor %}
+    </dl>
+
+    {{ table(running, "Running", "No running jobs.") }}
+    {{ table(pending, "Pending", "No pending jobs.") }}
+</div>

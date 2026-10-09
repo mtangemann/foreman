@@ -9,13 +9,10 @@ from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from werkzeug.serving import run_simple
 
 from foreman.assets import warn_if_stylesheet_stale
-from foreman.job import job, tracking_settings
-from foreman.job_list import job_list
-from foreman.job_tree import job_tree
-from foreman.search import search
+from foreman.blueprints import BLUEPRINTS
+from foreman.job import tracking_settings
 from foreman.settings import enabled
 from foreman.settings import load as load_settings
-from foreman.settings_page import settings_page
 from foreman.templating import autoescape
 from foreman.tensorboard import TensorBoardViewers, has_event_files
 from foreman.tracking_index import INDEX as tracking_index
@@ -32,11 +29,8 @@ app = Flask(
     static_folder=Path(__file__).parent / "static",
 )
 app.jinja_env.autoescape = autoescape
-app.register_blueprint(job)
-app.register_blueprint(job_list)
-app.register_blueprint(job_tree)
-app.register_blueprint(search)
-app.register_blueprint(settings_page)
+for blueprint in BLUEPRINTS:
+    app.register_blueprint(blueprint)
 
 joint_app = DispatcherMiddleware(app)
 tensorboard_viewers = TensorBoardViewers(joint_app.mounts)

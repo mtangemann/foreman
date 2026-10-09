@@ -36,3 +36,12 @@ TENSORBOARD_ENABLED = True
 SLURM_STATUS_ENABLED = True
 SLURM_HISTORY_ENABLED = True
 REPOSITORY_BRANCHES = True
+
+# Job queue page (editable on the page): shown columns (see QUEUE_COLUMNS in
+# foreman/slurm.py), whose jobs to show ("me" or "all"), and how often the page
+# updates itself in seconds (0: only on reload).
+QUEUE_COLUMNS = [
+    "state", "partition", "submitted", "start", "elapsed", "resources", "nodelist",
+]
+QUEUE_SCOPE = "me"
+QUEUE_REFRESH = 30
