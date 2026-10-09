@@ -125,6 +125,26 @@ in `foreman.tracking`, returning dictionaries with `provider`, `label`, and
 `url`. Missing or inaccessible roots return an empty list.
 
 
+### TensorBoard
+
+The TensorBoard link appears only when a bounded scan below the job directory
+finds a non-empty regular file named `events.out.tfevents.*`, including nested
+output folders. Detection checks filenames and file metadata; it does not parse
+event contents or guarantee that TensorBoard can read them. No TensorFlow
+dependency is required.
+
+Opening the link creates a local TensorBoard viewer for that job. The viewer is
+reused on subsequent opens of the same job within one Foreman server process;
+different jobs have separate viewers. Viewers and their loaders remain allocated
+until Foreman restarts.
+
+Embedded TensorBoard viewers are intended for **trusted local repositories**.
+The button-detection scan skips symlinks, and the open endpoint validates the job
+root, but TensorBoard's ongoing loader can follow nested symlinks or filesystem
+changes outside that root. These checks are not a filesystem sandbox. Isolation
+through a private event-file mirror is a separate follow-up.
+
+
 ## Versioning
 Updates to Foreman happen sporadically based on my needs and time. The versioning is
 based on the date of the last update in the format `YYYY.MM.DD`.

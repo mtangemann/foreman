@@ -20,6 +20,7 @@ from flask import (
 
 from foreman.job_stats import build_timeline, compute_stats, format_duration
 from foreman.r3_extension import Repository
+from foreman.tensorboard import has_event_files
 from foreman.tracking import discover_tracking_links
 
 job = Blueprint("job", __name__, url_prefix="/job")
@@ -39,6 +40,17 @@ def tracking_links(job):
             wandb_ui_url=current_app.config.get("WANDB_UI_URL"),
         )
     return g.tracking_links[key]
+
+
+@job.app_template_global()
+def tensorboard_available(job):
+    """Cache lightweight event-file discovery only for the current request."""
+    if not hasattr(g, "tensorboard_available"):
+        g.tensorboard_available = {}
+    key = str(job.path)
+    if key not in g.tensorboard_available:
+        g.tensorboard_available[key] = has_event_files(job.path)
+    return g.tensorboard_available[key]
 
 
 @job.route("/view/<id>")

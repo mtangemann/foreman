@@ -1,11 +1,10 @@
 import logging
 import os
+import re
 from pathlib import Path
 
 import click
-import tensorboard
-from flask import Flask, redirect, url_for
-from tensorboard.backend import application
+from flask import Flask, abort, redirect, url_for
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from werkzeug.serving import run_simple
 
@@ -15,6 +14,7 @@ from foreman.job_list import job_list
 from foreman.job_tree import job_tree
 from foreman.search import search
 from foreman.templating import autoescape
+from foreman.tensorboard import TensorBoardViewers, has_event_files
 
 R3_REPOSITORY = Path(os.environ["R3_REPOSITORY"])
 
@@ -33,6 +33,7 @@ app.register_blueprint(job_tree)
 app.register_blueprint(search)
 
 joint_app = DispatcherMiddleware(app)
+tensorboard_viewers = TensorBoardViewers(joint_app.mounts)
 
 app.config.from_object("foreman.config")
 # Optional machine-specific overrides in foreman/config_local.py (gitignored).
@@ -62,25 +63,29 @@ def index():
 
 @app.route("/tensorboard/open/<uuid>")
 def open_in_tensorboard(uuid):
-    keys_to_delete = [
-        key for key in joint_app.mounts.keys() if key.startswith("/tensorboard")
-    ]
-    for key in keys_to_delete:
-        del joint_app.mounts[key]
-
-    program = tensorboard.program.TensorBoard()
-    program.configure(logdir=str(R3_REPOSITORY / "jobs" / uuid))
-    (data_provider, deprecated_multiplexer) = program._make_data_provider()
-    tensorboard_app = application.TensorBoardWSGIApp(
-        program.flags,
-        program.plugin_loaders,
-        data_provider,
-        program.assets_zip_provider,
-        deprecated_multiplexer,
-    )
-
-    joint_app.mounts[f"/tensorboard/{uuid}"] = tensorboard_app
-    return redirect(f"/tensorboard/{uuid}")
+    # Reject traversal and the reserved mount name that would shadow this route.
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", uuid) or uuid == "open":
+        abort(404)
+    try:
+        jobs_root = (R3_REPOSITORY / "jobs").resolve()
+        candidate = jobs_root / uuid
+        if candidate.is_symlink():
+            abort(404)
+        job_root = candidate.resolve()
+    except (OSError, RuntimeError):
+        abort(404)
+    if (
+        not job_root.is_relative_to(jobs_root)
+        or job_root == jobs_root
+        or not has_event_files(job_root)
+    ):
+        abort(404, description="No TensorBoard event files were found for this job.")
+    try:
+        destination = tensorboard_viewers.open(uuid, job_root)
+    except Exception:
+        app.logger.exception("Could not initialize TensorBoard for job %s", uuid)
+        abort(503, description="TensorBoard could not be started. Please try again.")
+    return redirect(destination)
 
 
 if __name__ == "__main__":
