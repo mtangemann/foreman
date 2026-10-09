@@ -56,10 +56,16 @@ unsupported-file view instead of raising a decoding error.
 
 ## Experiment tracking links
 
-Foreman discovers local MLflow and Weights & Biases markers within each job
-directory, including nested output folders. Discovery does not contact tracking
-servers, parse logs or binary files, or establish whether a run still exists.
+Foreman discovers MLflow and Weights & Biases runs within each job directory,
+including nested output folders. Discovery does not contact tracking servers,
+parse binary files, or establish whether a run still exists.
 
+- **Run URLs in logs:** text logs (`*.log`, `*.out`, `*.err`, `*.txt`, e.g. the
+  Slurm log) are searched for MLflow run URLs (`…/#/experiments/<id>/runs/<id>`)
+  and W&B run URLs (on a host containing `wandb`). Trackers print these, e.g.
+  MLflow's `View run NAME at: URL` when a run ends, which also names the link.
+  This needs no configuration, so it works for runs logged to a tracking server.
+  Up to 64 logs per job are searched, and only the last 256 MiB of each.
 - **MLflow:** `mlruns/<experiment>/<run>/meta.yaml` supplies run identity;
   experiment `meta.yaml` can supply the experiment ID. Configure
   `FOREMAN_MLFLOW_UI_URL` with the HTTP(S) browser-facing MLflow base URL
@@ -77,6 +83,22 @@ servers, parse logs or binary files, or establish whether a run still exists.
 Set environment variables before starting Foreman. The discovery backend itself
 accepts these host values as keyword arguments rather than reading environment
 variables.
+
+### Caching and background indexing
+
+Scanning every job's directory and logs is too slow to do for each row of a job
+table, so `python -m foreman.app` indexes all jobs' links in a background thread,
+most recently changed jobs first, and refreshes them every
+`TRACKING_REFRESH_INTERVAL` seconds (default 60; `0` disables the indexer and
+discovers links on every request). Tables show indexed links, so right after the
+first start, links appear as the indexer reaches each job. A job's own page
+always discovers its links when opened.
+
+Log scans and discovered links are kept in `TRACKING_CACHE_DIR` (default
+`$XDG_CACHE_HOME/foreman/tracking`, i.e. `~/.cache/foreman/tracking`; override
+with `FOREMAN_TRACKING_CACHE_DIR`, or set it to `None` in `config_local.py` to
+keep them in memory only). Unchanged logs are not read again, also after a
+restart, and a growing log is only read from where the last scan ended.
 
 ### Explicit links
 

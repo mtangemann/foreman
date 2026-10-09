@@ -230,3 +230,89 @@ def test_explicit_experiment_link_and_distinct_url_labels(tmp_path):
     links = discover_tracking_links(tmp_path)
     assert links[0]["url"] == "https://ml.test/#/experiments/12"
     assert links[1]["label"] != links[2]["label"]
+
+
+RUN = "6f7b5c0ea95b4defae584d63b5d2925b"
+MLFLOW_RUN_URL = f"https://mlflow.test/#/experiments/42/runs/{RUN}"
+
+
+def log(root, path, text, mode="w"):
+    target = root / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with open(target, mode) as stream:
+        stream.write(text)
+    return target
+
+
+def test_mlflow_run_url_printed_in_slurm_log(tmp_path):
+    log(tmp_path, "output/slurm_1.log",
+        f"epoch 3\n\U0001f3c3 View run cosmos_ae at: {MLFLOW_RUN_URL}\n")
+    assert discover_tracking_links(tmp_path) == [
+        {"provider": "mlflow", "label": "MLflow: cosmos_ae", "url": MLFLOW_RUN_URL}
+    ]
+
+
+def test_log_runs_from_several_files_and_without_names(tmp_path):
+    other = "0" * 32
+    log(tmp_path, "output/a/run.log", f"View run first at: {MLFLOW_RUN_URL}\n")
+    log(tmp_path, "output/b/run.txt",
+        f"see https://mlflow.test/#/experiments/42/runs/{other} for details\n")
+    log(tmp_path, "output/c/stderr.err",
+        "wandb: \U0001f680 View run lively at: https://wandb.ai/team/proj/runs/ab12cd34\n")
+    links = discover_tracking_links(tmp_path)
+    assert [link["label"] for link in links] == [
+        f"MLflow: {other}", "MLflow: first", "W&B: lively",
+    ]
+
+
+def test_log_links_respect_overrides_and_url_safety(tmp_path):
+    log(tmp_path, "output/slurm_1.log",
+        f"View run a at: {MLFLOW_RUN_URL}\n"
+        "View run b at: https://user:pw@wandb.ai/team/proj/runs/ab12cd34\n")
+    assert [link["provider"] for link in discover_tracking_links(tmp_path)] == [
+        "mlflow"
+    ]
+    write(tmp_path, "metadata.yaml", {"tracking": {"mlflow": []}})
+    assert discover_tracking_links(tmp_path) == []
+
+
+def test_log_links_skip_checkpoints_symlinks_and_other_files(tmp_path):
+    line = f"View run a at: {MLFLOW_RUN_URL}\n"
+    log(tmp_path, "checkpoints/train.log", line)
+    log(tmp_path, "output/results.csv", line)
+    outside = log(tmp_path.parent / f"{tmp_path.name}-outside", "x.log", line)
+    (tmp_path / "linked.log").symlink_to(outside)
+    assert discover_tracking_links(tmp_path) == []
+
+
+def test_growing_log_is_rescanned_incrementally(tmp_path, monkeypatch):
+    path = log(tmp_path, "output/slurm_1.log", "starting\n" * 1000)
+    assert discover_tracking_links(tmp_path) == []
+    reads = []
+    original = Path.open
+
+    def tracked_open(self, *args, **kwargs):
+        stream = original(self, *args, **kwargs)
+        if self == path:
+            seek = stream.seek
+            def tracked_seek(offset, *rest):
+                reads.append(offset)
+                return seek(offset, *rest)
+            stream.seek = tracked_seek
+        return stream
+
+    monkeypatch.setattr(Path, "open", tracked_open)
+    assert discover_tracking_links(tmp_path) == []  # unchanged: not read again
+    assert reads == []
+    size = path.stat().st_size
+    log(tmp_path, "output/slurm_1.log", f"View run a at: {MLFLOW_RUN_URL}\n", mode="a")
+    links = discover_tracking_links(tmp_path)
+    assert [link["url"] for link in links] == [MLFLOW_RUN_URL]
+    assert reads == [size - tracking._LOG_OVERLAP_BYTES]
+
+
+def test_large_logs_only_read_their_end(tmp_path, monkeypatch):
+    monkeypatch.setattr(tracking, "MAX_LOG_BYTES", 100)
+    log(tmp_path, "output/early.log",
+        f"View run a at: {MLFLOW_RUN_URL}\n" + "x" * 200 + "\n")
+    assert discover_tracking_links(tmp_path) == []

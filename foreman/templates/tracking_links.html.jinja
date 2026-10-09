@@ -1,8 +1,8 @@
 {# Links to a job's experiment-tracking runs. Set `tracking_job`, and optionally
    `tracking_variant = "sidebar"` for the job sidebar (default: table row buttons). #}
 {% import "icons.html.jinja" as icons %}
-{% set links = tracking_links(tracking_job) %}
 {% set sidebar = tracking_variant is defined and tracking_variant == "sidebar" %}
+{% set links = tracking_links(tracking_job, fresh=sidebar) %}
 {% for provider, name in [('mlflow', 'MLflow'), ('wandb', 'W&B')] %}
     {% set runs = links | selectattr('provider', 'equalto', provider) | list %}
     {% set logo = url_for('static', filename='logos/' ~ provider ~ '.svg') %}

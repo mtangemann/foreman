@@ -3,7 +3,11 @@
 import configparser
 import json
 import os
+import re
+from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock
+from typing import MutableMapping
 from urllib.parse import quote, urlsplit, urlunsplit
 
 import yaml
@@ -17,6 +21,24 @@ SKIP_DIRECTORIES = {
     ".git", "__pycache__", "node_modules", "artifact", "artifacts",
     "checkpoint", "checkpoints",
 }
+
+# Text logs that may print a run's URL, e.g. MLflow's "View run NAME at: URL".
+LOG_SUFFIXES = {".log", ".out", ".err", ".txt"}
+MAX_LOG_FILES = 64
+# Only the end of larger logs is read; trackers print run URLs near the end.
+MAX_LOG_BYTES = 256 * 1024 * 1024
+_LOG_CHUNK_BYTES = 8 * 1024 * 1024
+# Chunks overlap so that a URL split across a chunk boundary is still found.
+_LOG_OVERLAP_BYTES = 4096
+_URL_CHARS = rb"[^\s\"'<>]"
+_LOG_LINK = re.compile(
+    rb"(?:View run (?P<name>\S+) at: )?(?:"
+    rb"(?P<mlflow>https?://" + _URL_CHARS
+    + rb"+/#/experiments/[0-9]+/runs/[0-9a-f]{32})"
+    rb"|(?P<wandb>https?://[^\s\"'<>#/]*wandb[^\s\"'<>#/]*"
+    rb"(?:/[^\s\"'<>#/]+){2}/runs/[A-Za-z0-9]+)"
+    rb")"
+)
 
 
 def _safe_url(value):
@@ -183,10 +205,122 @@ def _wandb_fields(directory, reader):
     return fields
 
 
+@dataclass(frozen=True)
+class _ScannedLog:
+    identity: tuple[int, int]
+    size: int
+    mtime_ns: int
+    # (provider, url, run name or None), in order of appearance.
+    links: tuple[tuple[str, str, str | None], ...]
+
+
+# Logs are scanned once and then only when they change; a log that grew (e.g.
+# of a running job) is scanned from where the last scan ended. The cache is in
+# memory unless `set_log_cache` provides a persistent mapping.
+_log_cache: MutableMapping = {}
+_log_cache_lock = Lock()
+
+
+def set_log_cache(cache: MutableMapping) -> None:
+    """Stores log scans in `cache` (e.g. a diskcache.Cache), keyed by path."""
+    global _log_cache
+    _log_cache = cache
+
+
+def _log_files(root):
+    """Yield text logs below root, bounded like other discovery."""
+    count = 0
+    for directory in _directories(root):
+        try:
+            with os.scandir(directory) as entries:
+                names = sorted(
+                    entry.name for entry in entries
+                    if entry.is_file(follow_symlinks=False)
+                    and os.path.splitext(entry.name)[1].lower() in LOG_SUFFIXES
+                )
+        except OSError:
+            continue
+        for name in names:
+            yield directory / name
+            count += 1
+            if count >= MAX_LOG_FILES:
+                return
+
+
+def _links_in(data):
+    """Yield (provider, url, name) for run URLs in a chunk of log text."""
+    # Every run URL contains "/runs/". Searching for it is much faster than
+    # running the full pattern over every byte, so only matching lines are parsed.
+    end = 0
+    while (hit := data.find(b"/runs/", end)) != -1:
+        start = data.rfind(b"\n", 0, hit) + 1
+        end = data.find(b"\n", hit)
+        end = len(data) if end == -1 else end
+        for match in _LOG_LINK.finditer(data, start, end):
+            provider = "mlflow" if match["mlflow"] else "wandb"
+            name = match["name"]
+            yield (
+                provider,
+                match[provider].decode("utf-8", "replace"),
+                name.decode("utf-8", "replace") if name else None,
+            )
+
+
+def _scan_log(path):
+    """Return run links printed in a log, reusing earlier scans of the file."""
+    try:
+        stat = path.stat()
+    except OSError:
+        return ()
+    identity = (stat.st_dev, stat.st_ino)
+    key = f"log:{path}"
+    with _log_cache_lock:
+        cached = _log_cache.get(key)
+    if (cached and cached.identity == identity and cached.size == stat.st_size
+            and cached.mtime_ns == stat.st_mtime_ns):
+        return cached.links
+
+    start, links = 0, []
+    if cached and cached.identity == identity and stat.st_size > cached.size:
+        start, links = cached.size - _LOG_OVERLAP_BYTES, list(cached.links)
+    start = max(start, stat.st_size - MAX_LOG_BYTES, 0)
+    try:
+        with path.open("rb") as stream:
+            stream.seek(start)
+            previous = b""
+            while chunk := stream.read(_LOG_CHUNK_BYTES):
+                data = previous + chunk
+                for link in _links_in(data):
+                    if link not in links:
+                        links.append(link)
+                previous = data[-_LOG_OVERLAP_BYTES:]
+    except OSError:
+        return cached.links if cached else ()
+    scanned = _ScannedLog(identity, stat.st_size, stat.st_mtime_ns, tuple(links))
+    with _log_cache_lock:
+        _log_cache[key] = scanned
+    return scanned.links
+
+
+def _log_links(root, providers):
+    """Turn URLs printed in the job's logs into links for the given providers."""
+    links = []
+    for path in _log_files(root):
+        for provider, url, name in _scan_log(path):
+            if provider not in providers or _safe_url(url) is None:
+                continue
+            run = url.rstrip("/").rsplit("/", 1)[-1]
+            label = f"{'MLflow' if provider == 'mlflow' else 'W&B'}: {name or run}"
+            links.append({"provider": provider, "label": label, "url": url})
+    return links
+
+
 def discover_tracking_links(
     root: Path, *, mlflow_ui_url=None, wandb_ui_url=None
 ) -> list[dict[str, str]]:
-    """Discover safe links without network access or parsing logs/artifacts.
+    """Discover safe links without network access or parsing artifacts.
+
+    Run URLs that trackers print into the job's text logs are found as well.
 
     A provider key in root metadata.yaml's tracking mapping replaces that
     provider's automatic discoveries, even when its value is empty or invalid.
@@ -237,6 +371,8 @@ def discover_tracking_links(
             ):
                 fields["base_url"] = "https://wandb.ai"
             add("wandb", fields)
+
+    links.extend(_log_links(root, {"mlflow", "wandb"} - set(overrides)))
 
     # Stable ordering and deduplication also make repeated discovery cacheable.
     unique: dict[tuple[str, str], dict[str, str]] = {}

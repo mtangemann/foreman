@@ -21,25 +21,34 @@ from flask import (
 from foreman.job_stats import build_timeline, compute_stats, format_duration
 from foreman.r3_extension import Repository
 from foreman.tensorboard import has_event_files
-from foreman.tracking import discover_tracking_links
+from foreman.tracking_index import INDEX as tracking_index
 
 job = Blueprint("job", __name__, url_prefix="/job")
 job.add_app_template_filter(format_duration, "duration")
 
 
 @job.app_template_global()
-def tracking_links(job):
-    """Resolve links once per job per request, including inside shared macros."""
+def tracking_links(job, fresh=False):
+    """Resolve links once per job per request, including inside shared macros.
+
+    Tables use indexed links; `fresh` (the job page) discovers them now.
+    """
     if not hasattr(g, "tracking_links"):
         g.tracking_links = {}
-    key = str(job.path)
+    key = (str(job.path), fresh)
     if key not in g.tracking_links:
-        g.tracking_links[key] = discover_tracking_links(
-            job.path,
-            mlflow_ui_url=current_app.config.get("MLFLOW_UI_URL"),
-            wandb_ui_url=current_app.config.get("WANDB_UI_URL"),
+        g.tracking_links[key] = tracking_index.links(
+            job.path, fresh=fresh, **tracking_settings(current_app.config),
         )
     return g.tracking_links[key]
+
+
+def tracking_settings(config) -> dict:
+    """Returns the tracking discovery settings from the app configuration."""
+    return {
+        "mlflow_ui_url": config.get("MLFLOW_UI_URL"),
+        "wandb_ui_url": config.get("WANDB_UI_URL"),
+    }
 
 
 @job.app_template_global()

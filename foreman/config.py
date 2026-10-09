@@ -18,3 +18,11 @@ SLURM_HISTORY_DAYS = 30
 # Browser-accessible tracking UI hosts; these do not identify a job's run.
 MLFLOW_UI_URL = os.environ.get("FOREMAN_MLFLOW_UI_URL")
 WANDB_UI_URL = os.environ.get("FOREMAN_WANDB_UI_URL")
+
+# Where to keep discovered tracking links and log scans across restarts
+# (None: in memory only). Defaults to $XDG_CACHE_HOME/foreman/tracking.
+TRACKING_CACHE_DIR = os.environ.get("FOREMAN_TRACKING_CACHE_DIR", "default")
+
+# Seconds between background refreshes of all jobs' tracking links. Job tables
+# show indexed links; 0 disables the indexer and discovers links per request.
+TRACKING_REFRESH_INTERVAL = 60

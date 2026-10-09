@@ -9,12 +9,14 @@ from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from werkzeug.serving import run_simple
 
 from foreman.assets import warn_if_stylesheet_stale
-from foreman.job import job
+from foreman.job import job, tracking_settings
 from foreman.job_list import job_list
 from foreman.job_tree import job_tree
 from foreman.search import search
 from foreman.templating import autoescape
 from foreman.tensorboard import TensorBoardViewers, has_event_files
+from foreman.tracking_index import INDEX as tracking_index
+from foreman.tracking_index import default_cache_dir
 
 R3_REPOSITORY = Path(os.environ["R3_REPOSITORY"])
 
@@ -46,6 +48,9 @@ app.config.from_pyfile(Path(__file__).parent / "config_local.py", silent=True)
 @click.option("--port", type=int, default=5000)
 @click.option("--debug", type=bool, default=False)
 def main(host, port, debug):
+    # With the reloader, only the child process (WERKZEUG_RUN_MAIN) serves requests.
+    if not debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        start_tracking_index()
     run_simple(
         host,
         port,
@@ -54,6 +59,19 @@ def main(host, port, debug):
         use_debugger=debug,
         use_evalex=debug,
     )
+
+
+def start_tracking_index():
+    cache_dir = app.config["TRACKING_CACHE_DIR"]
+    if cache_dir:
+        tracking_index.use_disk_cache(
+            default_cache_dir() if cache_dir == "default" else Path(cache_dir)
+        )
+    interval = app.config["TRACKING_REFRESH_INTERVAL"]
+    if interval:
+        tracking_index.start(
+            R3_REPOSITORY / "jobs", interval, **tracking_settings(app.config)
+        )
 
 
 @app.route("/")
