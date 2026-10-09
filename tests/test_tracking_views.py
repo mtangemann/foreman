@@ -196,7 +196,7 @@ def test_multiple_runs_have_chooser(views):
         "    - url: https://wandb.ai/team/project/runs/two\n"
     )
     html = unescape(client.get("/list/").get_data(as_text=True))
-    assert "<details" in html
+    assert "popovertarget=" in html and " popover" in html
     assert "W&B (2 runs)" in html
     assert "runs/one" in html
     assert "runs/two" in html
