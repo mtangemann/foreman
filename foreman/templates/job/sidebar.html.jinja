@@ -9,6 +9,7 @@
                     {{ icons.icon("external", "ml-auto h-3.5 w-3.5 text-gray-400") }}
                 </a>
             </li>
+            {% with tracking_job=job, tracking_variant="sidebar" %}{% include "tracking_links.html.jinja" %}{% endwith %}
             {% if job.has_report %}
             <li>
                 <a href="{{ url_for('job.view', id=job.id, file='/output/report.html') }}" class="{{ item }}">

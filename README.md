@@ -44,6 +44,87 @@ repository index. This uses R3's existing metadata and private index-update APIs
 file and index writes are not atomic, and concurrent edits can overwrite changes.
 
 
+## File previews
+
+The file browser previews UTF-8 `.json`, `.txt`, `.toml`, `.ini`, `.cfg`, `.tsv`,
+and `.xml` files in addition to Python and YAML files. TOML and TSV are displayed
+as plain text rather than parsed or rendered as tables. Image previews support
+PNG, JPEG (`.jpg` and `.jpeg`), GIF, and WebP. Text and image extension matching
+is case-insensitive; existing lowercase `.html` handling is unchanged.
+Invalid UTF-8 or binary text content falls back to the
+unsupported-file view instead of raising a decoding error.
+
+## Experiment tracking links
+
+Foreman discovers local MLflow and Weights & Biases markers within each job
+directory, including nested output folders. Discovery does not contact tracking
+servers, parse logs or binary files, or establish whether a run still exists.
+
+- **MLflow:** `mlruns/<experiment>/<run>/meta.yaml` supplies run identity;
+  experiment `meta.yaml` can supply the experiment ID. Configure
+  `FOREMAN_MLFLOW_UI_URL` with the HTTP(S) browser-facing MLflow base URL
+  (including a deployment path prefix if needed). A local `file:` tracking URI
+  is not a browser link.
+- **W&B:** `run-*` directories and saved `wandb/settings`, run settings, and
+  `wandb-metadata.json` supply entity, project, and run identity. Online runs
+  default to `https://wandb.ai`; configure `FOREMAN_WANDB_UI_URL` for a private
+  browser-facing installation. The configured UI host takes precedence over
+  inferred saved hosts; the standard saved `https://api.wandb.ai` host maps to
+  `https://wandb.ai`. Host configuration alone never supplies missing identity.
+  `offline-run-*` directories are not assumed to have been synced:
+  use explicit job metadata for a known remote run, or a saved explicit run URL.
+
+Set environment variables before starting Foreman. The discovery backend itself
+accepts these host values as keyword arguments rather than reading environment
+variables.
+
+### Explicit links
+
+In the job root's `metadata.yaml`, a provider entry under `tracking` overrides
+all automatic discoveries for that provider. Each provider accepts one mapping
+or a list of mappings. An empty or invalid provider entry suppresses automatic
+links rather than falling back to filesystem inference.
+
+```yaml
+tracking:
+  mlflow:
+    - experiment_id: "12"
+      run_id: "abc123"
+      ui_url: "https://mlflow.example.org"
+    - url: "https://mlflow.example.org/#/experiments/12/runs/other"
+  wandb:
+    entity: my-team
+    project: training
+    run_id: abc123
+    base_url: "https://wandb.example.org"
+```
+
+MLflow field-based links accept `tracking_uri` (HTTP(S) only), `ui_url`,
+`experiment_id`, and `run_id` (omit the run ID for an explicit experiment link).
+`ui_url` takes precedence over the configured
+MLflow UI host, which takes precedence over `tracking_uri`. W&B accepts
+`entity`, `project`, `run_id`, and `ui_url` or `base_url`; a per-record host takes
+precedence over configuration. For either provider, `url` specifies the complete
+run URL instead of constructing one from fields; an optional `label` names the
+link in the multiple-run chooser. Only HTTP(S) URLs without
+embedded credentials, whitespace, or control characters are emitted.
+
+### Discovery limits
+
+Discovery is best-effort: malformed, unreadable, oversized, or insufficient
+metadata is ignored. The scan is bounded to eight directory levels, 10,000
+directory entries, 256 candidate text files, and 256 KiB per file. Artifact and
+checkpoint directories are skipped, as are directory symlinks; file symlinks
+and paths resolving outside the job root are not read. Very large trees can
+therefore yield incomplete results. Multiple runs are returned in stable order,
+deduplicated by provider and URL.
+
+The Python API is
+`discover_tracking_links(root: Path, *, mlflow_ui_url=None, wandb_ui_url=None)`
+in `foreman.tracking`, returning dictionaries with `provider`, `label`, and
+`url`. Missing or inaccessible roots return an empty list.
+
+
 ## Versioning
 Updates to Foreman happen sporadically based on my needs and time. The versioning is
 based on the date of the last update in the format `YYYY.MM.DD`.

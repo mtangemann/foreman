@@ -39,6 +39,7 @@ app.config.from_object("foreman.config")
 app.config.from_pyfile(Path(__file__).parent / "config_local.py", silent=True)
 
 
+
 @click.command()
 @click.option("--host", type=str, default="localhost")
 @click.option("--port", type=int, default=5000)

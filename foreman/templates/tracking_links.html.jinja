@@ -1,0 +1,57 @@
+{# Links to a job's experiment-tracking runs. Set `tracking_job`, and optionally
+   `tracking_variant = "sidebar"` for the job sidebar (default: table row buttons). #}
+{% import "icons.html.jinja" as icons %}
+{% set links = tracking_links(tracking_job) %}
+{% set sidebar = tracking_variant is defined and tracking_variant == "sidebar" %}
+{% for provider, name in [('mlflow', 'MLflow'), ('wandb', 'W&B')] %}
+    {% set runs = links | selectattr('provider', 'equalto', provider) | list %}
+    {% set logo = url_for('static', filename='logos/' ~ provider ~ '.svg') %}
+    {% if runs | length == 1 %}
+        {% if sidebar %}
+        <li>
+            <a href="{{ runs[0].url }}" target="_blank" rel="noopener noreferrer" title="{{ runs[0].label }}"
+                class="flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                <img src="{{ logo }}" alt="" class="h-5 w-5 shrink-0">{{ name }}
+                {{ icons.icon("external", "ml-auto h-3.5 w-3.5 text-gray-400") }}
+            </a>
+        </li>
+        {% else %}
+        <a href="{{ runs[0].url }}" target="_blank" rel="noopener noreferrer" title="{{ runs[0].label }}" class="btn btn-ghost btn-sm">
+            <img src="{{ logo }}" alt="" class="btn-icon"><span class="hidden xl:inline">{{ name }}</span>
+        </a>
+        {% endif %}
+    {% elif runs %}
+        {% set label = name ~ " (" ~ (runs | length) ~ " runs)" %}
+        {% if sidebar %}
+        <li>
+            <details>
+                <summary class="flex cursor-pointer list-none items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                    <img src="{{ logo }}" alt="" class="h-5 w-5 shrink-0">{{ label }}
+                    {{ icons.icon("chevron-down", "ml-auto h-3.5 w-3.5 text-gray-400") }}
+                </summary>
+                <ul class="ml-5 mt-0.5 space-y-0.5 border-l border-gray-200 pl-2">
+                    {% for run in runs %}
+                    <li>
+                        <a href="{{ run.url }}" target="_blank" rel="noopener noreferrer"
+                            class="block truncate rounded-md px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 hover:text-gray-900" title="{{ run.label }}">{{ run.label }}</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </details>
+        </li>
+        {% else %}
+        <details class="relative inline-block">
+            <summary class="btn btn-ghost btn-sm list-none" title="{{ label }}">
+                <img src="{{ logo }}" alt="" class="btn-icon"><span class="hidden xl:inline">{{ label }}</span>
+                {{ icons.icon("chevron-down", "h-3 w-3") }}
+            </summary>
+            <div class="card absolute right-0 z-20 mt-1 w-72 p-1 text-left">
+                {% for run in runs %}
+                <a href="{{ run.url }}" target="_blank" rel="noopener noreferrer"
+                    class="block truncate rounded-md px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900" title="{{ run.label }}">{{ run.label }}</a>
+                {% endfor %}
+            </div>
+        </details>
+        {% endif %}
+    {% endif %}
+{% endfor %}
