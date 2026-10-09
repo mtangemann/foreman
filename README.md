@@ -17,6 +17,21 @@ alias foreman="ssh -t -L ${PORT:-5000}:localhost:${PORT:-5000} ${HOST:-server} p
 ```
 
 
+## Development
+Foreman is styled with [Tailwind CSS](https://tailwindcss.com/). The stylesheet
+`foreman/static/output.css` is generated and not committed, and it only contains the
+classes Tailwind found in the templates when it was built. **Rebuild it whenever you
+add or change Tailwind classes in a template, or after pulling changes that do:**
+
+```bash
+make css        # rebuild once
+make css-watch  # rebuild automatically while editing templates
+```
+
+Otherwise new classes silently have no effect and pages look unstyled. Foreman logs a
+warning at startup if `output.css` is missing or older than any template.
+
+
 ## Editing job tags
 On a job's detail page, choose **Edit tags**, enter one tag per line, and select
 **Save tags**. Add, remove, or rename tags by changing the lines; **Cancel**
