@@ -2,5 +2,5 @@
 {{ macros.file_breadcrumbs(uuid, path) }}
 
 <div class="card inline-block max-w-full overflow-auto p-2">
-    <img src="data:image/png;base64,{{ content }}" alt="{{ path }}" class="max-w-full">
+    <img src="data:{{ mime_type }};base64,{{ content }}" alt="{{ path }}" class="max-w-full">
 </div>

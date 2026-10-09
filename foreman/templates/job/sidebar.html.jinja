@@ -1,14 +1,12 @@
 {% import "icons.html.jinja" as icons %}
 {% set item = "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer" %}
-<aside class="hidden w-64 shrink-0 overflow-y-auto border-r border-gray-200 bg-white md:block" aria-label="Job">
+<aside id="logo-sidebar" class="hidden w-64 shrink-0 overflow-y-auto border-r border-gray-200 bg-white md:block" aria-label="Job">
     <div class="space-y-6 px-3 py-5">
         <ul class="space-y-0.5">
-            <li>
-                <a href="/tensorboard/open/{{ job.id }}" target="_blank" class="{{ item }}">
-                    {{ icons.tensorboard_logo("h-5 w-5 shrink-0") }}TensorBoard
-                    {{ icons.icon("external", "ml-auto h-3.5 w-3.5 text-gray-400") }}
-                </a>
-            </li>
+            {% if tensorboard_available(job) %}
+            <li>{% with tensorboard_job=job, tensorboard_variant="sidebar" %}{% include "tensorboard_link.html.jinja" %}{% endwith %}</li>
+            {% endif %}
+            {% with tracking_job=job, tracking_variant="sidebar" %}{% include "tracking_links.html.jinja" %}{% endwith %}
             {% if job.has_report %}
             <li>
                 <a href="{{ url_for('job.view', id=job.id, file='/output/report.html') }}" class="{{ item }}">
@@ -27,5 +25,24 @@
             <h2 class="mb-2 px-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500">Files</h2>
             <section id="files" hx-trigger="load" hx-get="{{ url_for('job.view_directory', id=job.id) }}"></section>
         </div>
+
+        {% if repositories %}
+        <div>
+            <h2 class="mb-2 px-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500">Repositories</h2>
+            <ul class="space-y-0.5">
+                {% for repo in repositories %}
+                <li>
+                    <a {% if repo.tree_url %}href="{{ repo.tree_url }}" target="_blank" rel="noopener noreferrer"{% endif %}
+                        title="{{ repo.repository }} at {{ repo.commit or 'an unresolved commit' }}{% if repo.source %}, {{ repo.source }}{% endif %}, checked out to {{ repo.destination }}"
+                        class="flex min-w-0 items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900">
+                        {{ icons.github("h-4 w-4 shrink-0 text-gray-500") }}
+                        <span class="min-w-0 flex-1 truncate">{{ repo.name.split("/")[-1] }}</span>
+                        {% if repo.commit %}<span class="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] text-gray-600">{{ repo.short_commit }}</span>{% endif %}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
     </div>
 </aside>

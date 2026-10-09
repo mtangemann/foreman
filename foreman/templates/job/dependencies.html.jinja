@@ -19,4 +19,13 @@
              hx-get="{{ url_for('job.dependencies_downstream', id=job.id) }}"
              hx-trigger="load" hx-swap="innerHTML"></div>
     </section>
+
+    <section>
+        <h2 class="mb-3 text-base font-semibold text-gray-900">Repositories</h2>
+        <div id="repository-deps"
+             hx-get="{{ url_for('job.dependencies_repositories', id=job.id) }}"
+             hx-trigger="load" hx-swap="innerHTML">
+            <div class="card card-body text-sm text-gray-500">Loading…</div>
+        </div>
+    </section>
 </div>

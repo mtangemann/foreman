@@ -11,6 +11,7 @@ from flask import (
     Blueprint,
     abort,
     current_app,
+    g,
     render_template,
     request,
     send_from_directory,
@@ -19,9 +20,62 @@ from flask import (
 
 from foreman.job_stats import build_timeline, compute_stats, format_duration
 from foreman.r3_extension import Repository
+from foreman.repositories import branches_containing, repository_links
+from foreman.settings import enabled
+from foreman.tensorboard import has_event_files
+from foreman.tracking_index import INDEX as tracking_index
 
 job = Blueprint("job", __name__, url_prefix="/job")
 job.add_app_template_filter(format_duration, "duration")
+
+
+@job.app_template_global()
+def tracking_links(job, fresh=False):
+    """Resolve links once per job per request, including inside shared macros.
+
+    Tables use indexed links; `fresh` (the job page) discovers them now.
+    """
+    if not hasattr(g, "tracking_links"):
+        g.tracking_links = {}
+    key = (str(job.path), fresh)
+    if key not in g.tracking_links:
+        settings = tracking_settings(current_app.config)
+        links = []
+        if settings["providers"]:
+            links = tracking_index.links(job.path, fresh=fresh, **settings)
+        # Filter as well, so that switching a provider off applies immediately
+        # to links indexed before.
+        g.tracking_links[key] = [
+            link for link in links if link["provider"] in settings["providers"]
+        ]
+    return g.tracking_links[key]
+
+
+def tracking_settings(config) -> dict:
+    """Returns the tracking discovery settings from the app configuration."""
+    return {
+        "mlflow_ui_url": config.get("MLFLOW_UI_URL"),
+        "wandb_ui_url": config.get("WANDB_UI_URL"),
+        "providers": tuple(
+            provider for provider, key in
+            (("mlflow", "MLFLOW_ENABLED"), ("wandb", "WANDB_ENABLED"))
+            if enabled(config, key)
+        ),
+        "scan_logs": enabled(config, "TRACKING_LOG_SCAN"),
+    }
+
+
+@job.app_template_global()
+def tensorboard_available(job):
+    """Cache lightweight event-file discovery only for the current request."""
+    if not enabled(current_app.config, "TENSORBOARD_ENABLED"):
+        return False
+    if not hasattr(g, "tensorboard_available"):
+        g.tensorboard_available = {}
+    key = str(job.path)
+    if key not in g.tensorboard_available:
+        g.tensorboard_available[key] = has_event_files(job.path)
+    return g.tensorboard_available[key]
 
 
 @job.route("/view/<id>")
@@ -37,6 +91,7 @@ def view(id: str):
         stats=compute_stats(job.timestamp, records, now),
         timeline=build_timeline(job.timestamp, records, now),
         open_file=request.args.get("file"),
+        repositories=repository_links(job.r3_job),
     )
 
 
@@ -114,6 +169,24 @@ def dependencies_downstream(id: str):
     )
 
 
+@job.route("/view/<id>/dependencies/repositories")
+def dependencies_repositories(id: str):
+    """The job's git repositories, with the branches that contain their commits."""
+    repository = Repository.from_environment()
+    job = repository.get(id)
+    links = repository_links(job.r3_job, repository.r3_repository.path)
+    branches = {}
+    if enabled(current_app.config, "REPOSITORY_BRANCHES"):
+        branches = {
+            link.repository: branches_containing(link.mirror, link.commit)
+            for link in links if link.mirror and link.commit
+        }
+    return render_template(
+        "job/_repository_list.html.jinja", repositories=links, branches=branches,
+        branches_enabled=enabled(current_app.config, "REPOSITORY_BRANCHES"),
+    )
+
+
 @job.route("/status/<id>")
 def status(id: str):
     repository = Repository.from_environment()
@@ -155,15 +228,33 @@ def view_directory(id: str, path: str = ""):
 def view_file(id: str, path: str = ""):
     repository = Repository.from_environment()
     job = repository.get(id)
-    complete_path = job.r3_job.path / path
+    jobs_root = (repository.r3_repository.path / "jobs").resolve()
+    job_root = job.r3_job.path.resolve()
+    complete_path = (job_root / path).resolve()
+    if (
+        not job_root.is_relative_to(jobs_root)
+        or job_root == jobs_root
+        or not complete_path.is_relative_to(job_root)
+        or not complete_path.is_file()
+    ):
+        abort(404)
 
-    if path.endswith(".png"):
+    extension = complete_path.suffix.lower().lstrip(".")
+    image_types = {
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "gif": "image/gif",
+        "webp": "image/webp",
+    }
+    if extension in image_types:
         with open(complete_path, "rb") as stream:
             content = base64.b64encode(stream.read()).decode("utf-8")
 
         return render_template(
             "job/file_image.html.jinja",
             content=content,
+            mime_type=image_types[extension],
             uuid=id,
             path=str(path).replace("/", " / "),
         )
@@ -177,18 +268,22 @@ def view_file(id: str, path: str = ""):
         )
 
     known_extensions = {
+        "cfg": "ini",
         "csv": "csv",
+        "ini": "ini",
         "json": "json",
         "log": "log",
         "md": "markdown",
         "qmd": "markdown",
         "py": "python",
         "sh": "shell",
+        "toml": "plaintext",
+        "tsv": "plaintext",
+        "txt": "plaintext",
+        "xml": "xml",
         "yaml": "yaml",
         "yml": "yaml",
     }
-
-    extension = path.rsplit(".", maxsplit=1)[-1]
 
     if extension not in known_extensions:
         return render_template(
@@ -198,8 +293,17 @@ def view_file(id: str, path: str = ""):
         )
 
     else:
-        with open(complete_path, "r") as stream:
-            content = stream.read()
+        try:
+            with open(complete_path, "r", encoding="utf-8") as stream:
+                content = stream.read()
+            if "\x00" in content:
+                raise UnicodeError("Binary content")
+        except UnicodeError:
+            return render_template(
+                "job/file_unknown.html.jinja",
+                uuid=id,
+                path=str(path).replace("/", " / "),
+            )
 
         return render_template(
             "job/file_text.html.jinja",

@@ -5,7 +5,7 @@ using this virtual directory structure.
 """
 from collections import defaultdict
 
-from flask import Blueprint, make_response, redirect, render_template, request, url_for
+from flask import Blueprint, make_response, render_template, request, url_for
 
 from foreman.r3_extension import Repository
 

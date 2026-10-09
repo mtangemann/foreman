@@ -58,6 +58,8 @@ def get_slurm():
             flask.current_app.config["SLURM_HOSTS"],
             cache_experiation=flask.current_app.config["SLURM_CACHE_EXPIRATION"],
             history_days=flask.current_app.config.get("SLURM_HISTORY_DAYS", 30),
+            status_enabled=flask.current_app.config.get("SLURM_STATUS_ENABLED", True),
+            history_enabled=flask.current_app.config.get("SLURM_HISTORY_ENABLED", True),
         )
 
     return flask.g.slurm
@@ -169,9 +171,13 @@ class Slurm:
 
     def __init__(
         self, hosts: list[str], cache_experiation: int = 5, history_days: int = 30,
+        status_enabled: bool = True, history_enabled: bool = True,
     ) -> None:
         self.hosts = hosts
         self.history_days = history_days
+        # Switched off, the corresponding Slurm commands are never run.
+        self.status_enabled = status_enabled
+        self.history_enabled = history_enabled
         self._cache_expiration = cache_experiation
         # Per-instance results, so a request asking about many jobs queries once.
         self._jobs: Optional[Dict[str, str]] = None
@@ -188,6 +194,8 @@ class Slurm:
 
     def get_jobs(self) -> Dict[str, str]:
         """Returns the Slurm states of queued and running jobs by matching key."""
+        if not self.status_enabled:
+            return {}
         if self._jobs is None:
             self._jobs = {}
             for host in self.hosts:
@@ -199,6 +207,8 @@ class Slurm:
 
         Defaults to the last `history_days` days. Records are sorted by submit time.
         """
+        if not self.history_enabled:
+            return {}
         if since is None:
             since = date.today() - timedelta(days=self.history_days)
 

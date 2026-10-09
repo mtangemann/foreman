@@ -7,6 +7,12 @@ import yaml
 from foreman.r3_extension import Repository
 
 
+@pytest.fixture(autouse=True)
+def isolated_settings(tmp_path, monkeypatch):
+    """Keep tests independent of a foreman.conf in the developer's checkout."""
+    monkeypatch.setenv("FOREMAN_CONFIG", str(tmp_path / "foreman.conf"))
+
+
 @pytest.fixture
 def repo(tmp_path):
     """A temp r3 repo: a <- b <- c, plus d depending on both b and c (a diamond)."""

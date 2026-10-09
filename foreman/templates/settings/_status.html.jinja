@@ -1,0 +1,46 @@
+{% import "icons.html.jinja" as icons %}
+<section class="card" aria-labelledby="index-heading">
+    <div class="card-header">
+        <h2 id="index-heading" class="card-title">Tracking link index</h2>
+        <div class="flex gap-2" hx-headers='{"X-Foreman-Request": "settings"}' hx-target="closest section" hx-swap="outerHTML">
+            <button type="button" class="btn btn-secondary btn-sm" hx-post="{{ url_for('settings_page.refresh_index') }}"
+                {% if not index.background %}disabled title="The background indexer is not running"{% endif %}>
+                {{ icons.icon("arrow-path") }}Refresh now
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" hx-post="{{ url_for('settings_page.clear_cache') }}"
+                hx-confirm="Forget all indexed links and log scans? All jobs' logs will be read again.">
+                {{ icons.icon("trash") }}Clear cache
+            </button>
+        </div>
+    </div>
+    <dl class="card-body grid gap-4 text-sm sm:grid-cols-3">
+        <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Background indexer</dt>
+            <dd class="mt-1 text-gray-900">
+                {% if not index.background %}Not running{% elif index.sweeping %}Refreshing…{% else %}Idle{% endif %}
+            </dd>
+        </div>
+        <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Last refresh</dt>
+            <dd class="mt-1 text-gray-900">
+                {% if index.last_sweep %}
+                {{ index.last_sweep.jobs }} jobs in {{ "%.1f" | format(index.last_sweep.seconds) }}s
+                <span class="block text-xs text-gray-500">at {{ index.last_sweep.finished.strftime("%Y-%m-%d %H:%M:%S") }}</span>
+                {% else %}–{% endif %}
+            </dd>
+        </div>
+        <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Cache</dt>
+            <dd class="mt-1 text-gray-900">
+                {% set size = index.cache_size() %}
+                {% if size is not none %}
+                {{ "%.1f" | format(size / 1e6) }} MB
+                <span class="block break-all font-mono text-xs text-gray-500">{{ index.cache_dir }}</span>
+                {% else %}In memory{% endif %}
+            </dd>
+        </div>
+    </dl>
+    {% if cleared %}
+    <p role="status" class="border-t border-gray-100 px-5 py-2 text-xs font-medium text-emerald-700">Cache cleared; all jobs are being refreshed.</p>
+    {% endif %}
+</section>
