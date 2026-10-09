@@ -32,6 +32,48 @@ Otherwise new classes silently have no effect and pages look unstyled. Foreman l
 warning at startup if `output.css` is missing or older than any template.
 
 
+## Settings
+The **Settings** page (top right) switches off integrations you don't use, to
+make pages faster:
+
+- **Tracking & TensorBoard:** MLflow links, W&B links, searching job logs for
+  run URLs (the most expensive part of finding runs), and TensorBoard detection.
+- **Slurm:** live job status (`squeue`), job history and run stats (`sacct`), and
+  how many days of history to use.
+- **Indexing:** the pause between background refreshes of tracking links.
+
+The page also shows the state of the tracking-link index and its cache, which
+can be refreshed or cleared there.
+
+Changes apply immediately and are stored in `foreman.conf` at the repository
+root (gitignored), or in the file named by `FOREMAN_CONFIG`. It is an INI file
+that can also be edited by hand; edits apply on the next request. Its values
+take precedence over `config_local.py`, which takes precedence over the
+defaults in `foreman/config.py`. The page only stores values that differ from
+the Python configuration, and shows where each value comes from.
+
+```ini
+[tracking]
+mlflow = on
+wandb = off
+log_scan = on
+tensorboard = off
+
+[slurm]
+status = on
+history = on
+history_days = 30
+
+[indexing]
+refresh_interval = 60
+```
+
+Host names and tracking server URLs are only configured in the Python
+configuration, since Foreman has no login and host names are used in `ssh`
+commands. Setting `TRACKING_REFRESH_INTERVAL = 0` there disables the background
+indexer until Foreman restarts.
+
+
 ## Editing job tags
 On a job's detail page, choose **Edit tags**, enter one tag per line, and select
 **Save tags**. Add, remove, or rename tags by changing the lines; **Cancel**

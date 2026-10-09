@@ -40,7 +40,7 @@ def test_background_tables_only_read_indexed_links(tmp_path, monkeypatch):
         return original(root, **settings)
 
     monkeypatch.setattr(index, "refresh", tracked_refresh)
-    index.start(tmp_path / "jobs", interval=3600)
+    index.start(tmp_path / "jobs", lambda: (3600, {}))
     wait_for(lambda: len(refreshed) == 2)
     assert refreshed == ["new", "old"]  # most recently changed first
     assert index.background

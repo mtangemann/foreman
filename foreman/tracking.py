@@ -316,11 +316,13 @@ def _log_links(root, providers):
 
 
 def discover_tracking_links(
-    root: Path, *, mlflow_ui_url=None, wandb_ui_url=None
+    root: Path, *, mlflow_ui_url=None, wandb_ui_url=None,
+    providers=("mlflow", "wandb"), scan_logs=True,
 ) -> list[dict[str, str]]:
     """Discover safe links without network access or parsing artifacts.
 
-    Run URLs that trackers print into the job's text logs are found as well.
+    Run URLs that trackers print into the job's text logs are found as well,
+    unless `scan_logs` is false. Only the given `providers` are looked for.
 
     A provider key in root metadata.yaml's tracking mapping replaces that
     provider's automatic discoveries, even when its value is empty or invalid.
@@ -344,20 +346,21 @@ def discover_tracking_links(
         if link:
             links.append(link)
 
-    for provider in ("mlflow", "wandb"):
+    for provider in providers:
         if provider in overrides:
             records = overrides[provider]
             for record in records if isinstance(records, list) else [records]:
                 add(provider, record)
 
-    for directory in _directories(root):
-        if ("mlflow" not in overrides and directory.parent.parent.name == "mlruns"):
+    for directory in _directories(root) if providers else ():
+        if ("mlflow" in providers and "mlflow" not in overrides
+                and directory.parent.parent.name == "mlruns"):
             fields = dict(reader.read(directory / "meta.yaml"))
             experiment = reader.read(directory.parent / "meta.yaml")
             fields.setdefault("experiment_id", experiment.get("experiment_id"))
             if _identity(fields.get("run_id", fields.get("run_uuid"))):
                 add("mlflow", fields)
-        if ("wandb" not in overrides
+        if ("wandb" in providers and "wandb" not in overrides
                 and directory.name.startswith(("run-", "offline-run-"))):
             fields = _wandb_fields(directory, reader)
             # Offline identity is not evidence that this run was synced.
@@ -372,7 +375,8 @@ def discover_tracking_links(
                 fields["base_url"] = "https://wandb.ai"
             add("wandb", fields)
 
-    links.extend(_log_links(root, {"mlflow", "wandb"} - set(overrides)))
+    if scan_logs and set(providers) - set(overrides):
+        links.extend(_log_links(root, set(providers) - set(overrides)))
 
     # Stable ordering and deduplication also make repeated discovery cacheable.
     unique: dict[tuple[str, str], dict[str, str]] = {}

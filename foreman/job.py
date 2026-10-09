@@ -20,6 +20,7 @@ from flask import (
 
 from foreman.job_stats import build_timeline, compute_stats, format_duration
 from foreman.r3_extension import Repository
+from foreman.settings import enabled
 from foreman.tensorboard import has_event_files
 from foreman.tracking_index import INDEX as tracking_index
 
@@ -37,9 +38,15 @@ def tracking_links(job, fresh=False):
         g.tracking_links = {}
     key = (str(job.path), fresh)
     if key not in g.tracking_links:
-        g.tracking_links[key] = tracking_index.links(
-            job.path, fresh=fresh, **tracking_settings(current_app.config),
-        )
+        settings = tracking_settings(current_app.config)
+        links = []
+        if settings["providers"]:
+            links = tracking_index.links(job.path, fresh=fresh, **settings)
+        # Filter as well, so that switching a provider off applies immediately
+        # to links indexed before.
+        g.tracking_links[key] = [
+            link for link in links if link["provider"] in settings["providers"]
+        ]
     return g.tracking_links[key]
 
 
@@ -48,12 +55,20 @@ def tracking_settings(config) -> dict:
     return {
         "mlflow_ui_url": config.get("MLFLOW_UI_URL"),
         "wandb_ui_url": config.get("WANDB_UI_URL"),
+        "providers": tuple(
+            provider for provider, key in
+            (("mlflow", "MLFLOW_ENABLED"), ("wandb", "WANDB_ENABLED"))
+            if enabled(config, key)
+        ),
+        "scan_logs": enabled(config, "TRACKING_LOG_SCAN"),
     }
 
 
 @job.app_template_global()
 def tensorboard_available(job):
     """Cache lightweight event-file discovery only for the current request."""
+    if not enabled(current_app.config, "TENSORBOARD_ENABLED"):
+        return False
     if not hasattr(g, "tensorboard_available"):
         g.tensorboard_available = {}
     key = str(job.path)

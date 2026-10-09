@@ -8,3 +8,4 @@ __pycache__
 node_modules/
 foreman/static/output.css
 foreman/config_local.py
+foreman.conf

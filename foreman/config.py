@@ -2,7 +2,8 @@ import os
 
 # Default configuration. For machine-specific overrides, create `config_local.py`
 # next to this file (gitignored); its UPPERCASE names take precedence.
-# See config_local.example.py.
+# See config_local.example.py. Settings changed on the settings page are stored
+# in foreman.conf (see foreman/settings.py) and take precedence over both.
 
 # SSH host names of the SLURM head nodes. Use "local" to run `squeue` and `sacct`
 # on the machine running Foreman instead, e.g. when it runs on a cluster node.
@@ -26,3 +27,11 @@ TRACKING_CACHE_DIR = os.environ.get("FOREMAN_TRACKING_CACHE_DIR", "default")
 # Seconds between background refreshes of all jobs' tracking links. Job tables
 # show indexed links; 0 disables the indexer and discovers links per request.
 TRACKING_REFRESH_INTERVAL = 60
+
+# Switches for integrations that cost time on every page (settings page).
+MLFLOW_ENABLED = True
+WANDB_ENABLED = True
+TRACKING_LOG_SCAN = True
+TENSORBOARD_ENABLED = True
+SLURM_STATUS_ENABLED = True
+SLURM_HISTORY_ENABLED = True

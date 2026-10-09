@@ -13,6 +13,9 @@ from foreman.job import job, tracking_settings
 from foreman.job_list import job_list
 from foreman.job_tree import job_tree
 from foreman.search import search
+from foreman.settings import enabled
+from foreman.settings import load as load_settings
+from foreman.settings_page import settings_page
 from foreman.templating import autoescape
 from foreman.tensorboard import TensorBoardViewers, has_event_files
 from foreman.tracking_index import INDEX as tracking_index
@@ -33,6 +36,7 @@ app.register_blueprint(job)
 app.register_blueprint(job_list)
 app.register_blueprint(job_tree)
 app.register_blueprint(search)
+app.register_blueprint(settings_page)
 
 joint_app = DispatcherMiddleware(app)
 tensorboard_viewers = TensorBoardViewers(joint_app.mounts)
@@ -40,6 +44,8 @@ tensorboard_viewers = TensorBoardViewers(joint_app.mounts)
 app.config.from_object("foreman.config")
 # Optional machine-specific overrides in foreman/config_local.py (gitignored).
 app.config.from_pyfile(Path(__file__).parent / "config_local.py", silent=True)
+# Settings from the settings page (foreman.conf, gitignored) take precedence.
+load_settings(app.config)
 
 
 
@@ -67,11 +73,15 @@ def start_tracking_index():
         tracking_index.use_disk_cache(
             default_cache_dir() if cache_dir == "default" else Path(cache_dir)
         )
-    interval = app.config["TRACKING_REFRESH_INTERVAL"]
-    if interval:
-        tracking_index.start(
-            R3_REPOSITORY / "jobs", interval, **tracking_settings(app.config)
-        )
+    if app.config["TRACKING_REFRESH_INTERVAL"]:
+        # Read before every sweep, so that changed settings apply without a restart.
+        def configuration():
+            return (
+                app.config["TRACKING_REFRESH_INTERVAL"],
+                tracking_settings(app.config),
+            )
+
+        tracking_index.start(R3_REPOSITORY / "jobs", configuration)
 
 
 @app.route("/")
@@ -81,6 +91,8 @@ def index():
 
 @app.route("/tensorboard/open/<uuid>")
 def open_in_tensorboard(uuid):
+    if not enabled(app.config, "TENSORBOARD_ENABLED"):
+        abort(404, description="TensorBoard is switched off in the settings.")
     # Reject traversal and the reserved mount name that would shadow this route.
     if not re.fullmatch(r"[A-Za-z0-9_-]+", uuid) or uuid == "open":
         abort(404)
