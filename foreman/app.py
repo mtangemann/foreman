@@ -13,6 +13,7 @@ from foreman.job import job
 from foreman.job_list import job_list
 from foreman.job_tree import job_tree
 from foreman.search import search
+from foreman.templating import autoescape
 
 R3_REPOSITORY = Path(os.environ["R3_REPOSITORY"])
 
@@ -23,6 +24,7 @@ app = Flask(
     template_folder=Path(__file__).parent / "templates",
     static_folder=Path(__file__).parent / "static",
 )
+app.jinja_env.autoescape = autoescape
 app.register_blueprint(job)
 app.register_blueprint(job_list)
 app.register_blueprint(job_tree)
@@ -32,7 +34,7 @@ joint_app = DispatcherMiddleware(app)
 
 app.config.from_object("foreman.config")
 # Optional machine-specific overrides in foreman/config_local.py (gitignored).
-app.config.from_pyfile("config_local.py", silent=True)
+app.config.from_pyfile(Path(__file__).parent / "config_local.py", silent=True)
 
 
 @click.command()
