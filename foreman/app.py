@@ -9,6 +9,7 @@ from tensorboard.backend import application
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from werkzeug.serving import run_simple
 
+from foreman.assets import warn_if_stylesheet_stale
 from foreman.job import job
 from foreman.job_list import job_list
 from foreman.job_tree import job_tree
@@ -18,6 +19,7 @@ from foreman.templating import autoescape
 R3_REPOSITORY = Path(os.environ["R3_REPOSITORY"])
 
 logging.basicConfig(level=logging.INFO)
+warn_if_stylesheet_stale()
 
 app = Flask(
     "app",

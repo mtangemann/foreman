@@ -107,32 +107,9 @@
                 {% endfor %}
             </ol>
         </section>
-        <section class="card lg:col-span-2" aria-labelledby="tags-heading">
-            <div class="card-header">
-                <h2 id="tags-heading" class="card-title">Tags</h2>
-                <span class="text-xs text-gray-500">{{ job.tags | length }}</span>
-            </div>
-            <div class="card-body">
-                {% if job.tags %}
-                <div class="flex flex-wrap gap-1.5">
-                    {% for text in job.leaf_tags %}{{ macros.tag(text) }}{% endfor %}
-                </div>
-                {% set parents = job.tags | reject("in", job.leaf_tags) | list %}
-                {% if parents %}
-                <details class="group mt-3">
-                    <summary class="cursor-pointer select-none text-xs font-medium text-gray-500 hover:text-gray-700">
-                        {{ parents | length }} parent tag{{ "s" if parents | length != 1 }}
-                    </summary>
-                    <div class="mt-2 flex flex-wrap gap-1.5">
-                        {% for text in parents %}{{ macros.tag(text) }}{% endfor %}
-                    </div>
-                </details>
-                {% endif %}
-                {% else %}
-                <p class="text-sm text-gray-500">No tags</p>
-                {% endif %}
-            </div>
-        </section>
+        <div class="lg:col-span-2">
+            {% include "job/tags.html.jinja" %}
+        </div>
     </div>
 
     <section class="card" aria-labelledby="run-heading">

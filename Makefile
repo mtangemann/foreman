@@ -1,4 +1,4 @@
-.PHONY: clean fix install lint lint/ruff lint/mypy test
+.PHONY: clean css css-watch fix install lint lint/ruff lint/mypy test
 
 clean:
 	rm -rf build
@@ -12,6 +12,9 @@ clean:
 
 css:
 	cd foreman/static && npx tailwindcss -i input.css -o output.css
+
+css-watch:
+	cd foreman/static && npx tailwindcss -i input.css -o output.css --watch
 
 fix:
 	ruff check --fix .
