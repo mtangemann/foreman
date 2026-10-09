@@ -3,7 +3,7 @@
 {{ macros.file_breadcrumbs(uuid, path) }}
 
 <pre id="file_content" style="width:0;height:0;overflow:hidden;">
-{{ content }}
+{{ content | e }}
 </pre>
 
 <div id="container" class="card min-h-0 flex-1 overflow-hidden">

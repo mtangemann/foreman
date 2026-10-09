@@ -17,6 +17,18 @@ alias foreman="ssh -t -L ${PORT:-5000}:localhost:${PORT:-5000} ${HOST:-server} p
 ```
 
 
+## Editing job tags
+On a job's detail page, choose **Edit tags**, enter one tag per line, and select
+**Save tags**. Add, remove, or rename tags by changing the lines; **Cancel**
+discards unsaved edits. Whitespace, blank lines, and duplicate tags are removed,
+while order and case are preserved. Saving an empty list clears all tags.
+
+Changes apply only to that job's tags and immediately refresh R3's search index.
+The Foreman process needs write access to both the job's `metadata.yaml` and the
+repository index. This uses R3's existing metadata and private index-update APIs;
+file and index writes are not atomic, and concurrent edits can overwrite changes.
+
+
 ## Versioning
 Updates to Foreman happen sporadically based on my needs and time. The versioning is
 based on the date of the last update in the format `YYYY.MM.DD`.

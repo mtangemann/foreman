@@ -1,0 +1,65 @@
+{% import "macros.html.jinja" as macros %}
+{% import "icons.html.jinja" as icons %}
+<section id="tag-section" aria-labelledby="tag-heading" tabindex="-1"
+    class="card focus:outline-none"
+    hx-target="#tag-section" hx-swap="outerHTML"
+    hx-on::before-swap="if ([400, 500].includes(event.detail.xhr.status)) { event.detail.shouldSwap = true; event.detail.isError = false; }"
+    hx-on::after-swap="if (!this.querySelector('textarea')) this.focus({preventScroll: true})">
+    <div class="card-header">
+        <h2 id="tag-heading" class="card-title">
+            Tags <span class="ml-1 text-xs font-normal text-gray-500">{{ job.tags | length }}</span>
+        </h2>
+        {% if not editing %}
+        <button type="button" hx-get="{{ url_for('job.tags', id=job.id, edit=1) }}" class="btn btn-secondary btn-sm">
+            {{ icons.icon("pencil") }}Edit tags
+        </button>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        {% if editing %}
+        <form hx-post="{{ url_for('job.tags', id=job.id) }}" hx-headers='{"X-Foreman-Request": "tags"}'
+            hx-disabled-elt="#tag-section button, #tag-section textarea"
+            hx-on::before-request="if (event.detail.requestConfig.verb === 'post') this.querySelector('[role=status]').textContent = 'Saving…'"
+            hx-on::after-request="this.querySelector('[role=status]').textContent = ''">
+            <label for="tag-input" class="sr-only">Job tags</label>
+            <textarea id="tag-input" name="tags" rows="8" wrap="off" autofocus spellcheck="false"
+                aria-describedby="tag-help{% if error %} tag-error{% endif %}"
+                {% if error %}aria-invalid="true"{% endif %}
+                class="input w-full font-mono text-xs leading-5 {{ 'ring-red-300 focus:ring-red-500' if error }} disabled:opacity-60">{{ tags_text if tags_text is defined else job.tags | join('\n') }}</textarea>
+            <p id="tag-help" class="mt-2 text-xs text-gray-500">
+                One tag per line. Blank lines and duplicates are removed. Leave empty to clear all tags.
+            </p>
+            {% if error %}
+            <p id="tag-error" role="alert" class="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ error }}</p>
+            {% endif %}
+            <div class="mt-4 flex items-center gap-2">
+                <button type="submit" class="btn btn-primary btn-sm">{{ icons.icon("check") }}Save tags</button>
+                <button type="button" hx-get="{{ url_for('job.tags', id=job.id) }}" class="btn btn-secondary btn-sm">Cancel</button>
+                <span class="htmx-indicator text-xs text-gray-500" role="status"></span>
+            </div>
+        </form>
+        {% else %}
+            {% if job.tags %}
+            <div class="flex flex-wrap gap-1.5">
+                {% for text in job.leaf_tags %}{{ macros.tag(text) }}{% endfor %}
+            </div>
+            {% set parents = job.tags | reject("in", job.leaf_tags) | list %}
+            {% if parents %}
+            <details class="mt-3">
+                <summary class="cursor-pointer select-none text-xs font-medium text-gray-500 hover:text-gray-700">
+                    {{ parents | length }} parent tag{{ "s" if parents | length != 1 }}
+                </summary>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                    {% for text in parents %}{{ macros.tag(text) }}{% endfor %}
+                </div>
+            </details>
+            {% endif %}
+            {% else %}
+            <p class="text-sm text-gray-500">No tags yet</p>
+            {% endif %}
+            {% if saved %}
+            <p role="status" class="mt-3 flex items-center gap-1 text-xs font-medium text-emerald-700">{{ icons.icon("check", "h-3.5 w-3.5") }}Tags saved</p>
+            {% endif %}
+        {% endif %}
+    </div>
+</section>

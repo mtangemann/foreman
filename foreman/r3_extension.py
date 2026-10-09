@@ -154,6 +154,35 @@ class Repository():
         """Returns a job by its ID."""
         return Job(self.r3_repository._storage.get(job_id))
 
+    def update_tags(self, job_id: str, tags: list[str]) -> Job:
+        """Replaces a job's tags and refreshes its search index entry.
+
+        Tags must be a list of single-line strings. Whitespace and blank tags
+        are removed, and duplicates retain their first occurrence and case.
+        Metadata and index writes are separate, not atomic or concurrency-safe.
+        """
+        if not isinstance(tags, list):
+            raise ValueError("Tags must be a list of strings.")
+
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for tag in tags:
+            if not isinstance(tag, str):
+                raise ValueError("Tags must be a list of strings.")
+            if "\n" in tag or "\r" in tag:
+                raise ValueError("Tags must not contain newlines.")
+            tag = tag.strip()
+            if tag and tag not in seen:
+                normalized.append(tag)
+                seen.add(tag)
+
+        # Read storage directly: query results can carry stale cached metadata.
+        r3_job = self.r3_repository._storage.get(job_id)
+        r3_job.metadata["tags"] = normalized
+        r3_job.save_metadata()
+        self.r3_repository._index.update(r3_job)
+        return Job(r3_job)
+
     @classmethod
     def from_environment(cls) -> "Repository":
         """Creates a repository from the `R3_REPOSITORY` environment variable."""

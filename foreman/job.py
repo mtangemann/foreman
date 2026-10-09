@@ -4,9 +4,18 @@ Job blueprint.
 Displays information about individual jobs.
 """
 import base64
+import sqlite3
 from datetime import datetime
 
-from flask import Blueprint, render_template, request, send_from_directory, url_for
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    render_template,
+    request,
+    send_from_directory,
+    url_for,
+)
 
 from foreman.job_stats import build_timeline, compute_stats, format_duration
 from foreman.r3_extension import Repository
@@ -29,6 +38,47 @@ def view(id: str):
         timeline=build_timeline(job.timestamp, records, now),
         open_file=request.args.get("file"),
     )
+
+
+@job.route("/view/<id>/tags", methods=["GET", "POST"])
+def tags(id: str):
+    # A custom header prevents cross-origin HTML forms from submitting writes.
+    # Foreman's same-origin HTMX form supplies it; this is not authentication.
+    if request.method == "POST" and request.headers.get("X-Foreman-Request") != "tags":
+        abort(403)
+
+    repository = Repository.from_environment()
+    try:
+        job = repository.get(id)
+    except (FileNotFoundError, ValueError):
+        abort(404)
+
+    if request.method == "GET":
+        return render_template(
+            "job/tags.html.jinja", job=job, editing=request.args.get("edit") == "1",
+        )
+
+    values = request.form.getlist("tags")
+    tags_text = values[0] if values else ""
+    error = None
+    status = 400
+    if len(values) != 1:
+        error = "Submit tags as one list, with one tag per line."
+    else:
+        try:
+            job = repository.update_tags(id, tags_text.splitlines())
+        except ValueError as exception:
+            error = str(exception)
+        except (OSError, sqlite3.Error):
+            current_app.logger.exception("Could not save tags for job %s", id)
+            error = "Tags could not be fully saved. Try again or check the server logs."
+            status = 500
+        else:
+            return render_template("job/tags.html.jinja", job=job, saved=True)
+
+    return render_template(
+        "job/tags.html.jinja", job=job, editing=True, tags_text=tags_text, error=error,
+    ), status
 
 
 @job.route("/view/<id>/dependencies")
